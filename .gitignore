@@ -1,0 +1,6 @@
+# 机器本地的符号链接：preset/node_modules/@deepseek-ai 指向已安装 harness 的依赖树。
+# 它指向仓库之外、换机即失效，由 scripts/install.sh 重建。
+preset/node_modules/
+
+# 探针与临时 checkout（上游快照、布局比对等）
+.tmp-*/
