@@ -3,7 +3,7 @@
 | 项 | 值 |
 |---|---|
 | 日期 | 2026-09-12 |
-| 目标仓库 | `/home/goalizc/superpowers-dsh` |
+| 目标仓库 | `$REPO` |
 | 状态 | 设计已确认，待实施 |
 | 动机 | 该目录此前**不是** git 仓库（无 `.git`、无 `.gitignore`），需要一个可公开推送的版本历史 |
 
@@ -26,7 +26,7 @@
 | 约束 | 证据 | 影响 |
 |---|---|---|
 | `~/.dsh` 挂载为**只读** | `findmnt` → `ext4 ro,nosuid,nodev` | 本会话无法运行 `install.sh`；但已安装的 preset 是由符号链接指回本 workspace，故本仓库的编辑仍然生效 |
-| `/mnt/c`、`/mnt/d`、`/mnt/e` 均为**只读** | `findmnt` → `9p ro,...` | 无法在外部建 worktree 或备份镜像 |
+| Windows 盘符挂载（`/mnt/*`）均为**只读** | `findmnt` → `9p ro,...` | 无法在外部建 worktree 或备份镜像 |
 | 无 `~/.gitconfig`，无全局 `user.*` | `git config --list --show-origin` 空 | 必须设置**仓库局部**身份 |
 | 无 GitHub 凭据 | 无 credential helper 配置 | 本会话**不能** `git push`；只准备 remote 与步骤 |
 | `git subtree` 可用 | `git subtree add` 实测 EXIT=0 | 虽然 `git subtree --help` 因无 man 而失败，但子命令本身正常 |
@@ -126,8 +126,8 @@ subtree 的合并只依赖一个祖先提交，不需要上游全部历史。实
 
 | 原值 | 替换为 | 出现处 |
 |---|---|---|
-| `/home/goalizc/superpowers-dsh` | `$REPO` | 报告与验证记录 |
-| `/home/goalizc/.dsh` | `$DSH_HOME` | 报告与验证记录 |
+| `$REPO` | `$REPO` | 报告与验证记录 |
+| `$HOME/.dsh` | `$DSH_HOME` | 报告与验证记录 |
 | `/mnt/e/project/superpowers` | `$UPSTREAM` | 报告（5 行 / 8 次）与 SYNC.md（1 处） |
 | `http://127.0.0.1:3080` | `$DSH_WEB_URL` | 报告 |
 
@@ -156,10 +156,14 @@ subtree 的合并只依赖一个祖先提交，不需要上游全部历史。实
 git status --porcelain                 # 期望：空
 git ls-files | wc -l                   # 期望：约 62
 git ls-files preset/node_modules | wc -l   # 期望：0
-git grep -n "/home/goalizc\|/mnt/e" -- .   # 期望：无输出
+git grep -n "/home/[a-z]\|/mnt/[a-z]/" -- README.md docs/feasibility-report.md evidence preset scripts   # 期望：无输出
 diff -rq <上游v6.1.1>/skills preset/skills  # 期望：仅两处已知差异
 node preset/plugins/superpowers-bootstrap/selftest.mjs  # 期望：selftest OK
 ```
+
+脱敏断言**刻意排除 `docs/superpowers/{specs,plans}/`**：这两份是实现文档，必须字面写出被替换的路径与脱敏规则（例如替换表与 `sed` 规则本身），否则无法理解与复现。它们记录的是"本机路径曾被替换掉"这一事实，不是路径泄漏。其余被分发的内容文件一律零命中。
+
+断言也**不包含 `127.0.0.1`**：`preset/skills/**` 是上游逐字副本，其中 brainstorming 的配套脚本本就以 `127.0.0.1` 作默认绑定地址，那是上游内容而非本机标识。本仓库自己写下的 `127.0.0.1:3080` 已替换为 `$DSH_WEB_URL`。
 
 最后一条尤为重要：它证明脱敏与 git 操作**没有触碰运行时代码**。
 

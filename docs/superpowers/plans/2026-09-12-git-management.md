@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 `/home/goalizc/superpowers-dsh` 从无版本管理的目录变成一个可公开推送到 GitHub、不含本机信息、且许可合规的 git 仓库。
+**Goal:** 把 `$REPO` 从无版本管理的目录变成一个可公开推送到 GitHub、不含本机信息、且许可合规的 git 仓库。
 
 **Architecture:** 原地 `git init`（使用仓库局部身份，因为全局 `user.*` 与 `~/.gitconfig` 都不存在）；`preset/node_modules/` 与临时目录写入 `.gitignore`；`preset/skills/` 用一个只含上游 v6.1.1 的单提交快照经 `git subtree add` 导入，两处 DSH 本地改动作为叠加提交保留（这是否决 submodule 的全部理由）；三份含本机路径的文档在入库前做占位符化脱敏；补齐 MIT 许可与第三方声明。最终由人类推送（本会话无凭据）。
 
@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- 仓库路径固定为 `/home/goalizc/superpowers-dsh`；所有命令在仓库根执行。
+- 仓库路径固定为 `$REPO`；所有命令在仓库根执行。
 - git 身份**仅设仓库局部**：`user.name=goalizc`、`user.email=goalizc@localhost`。不得写 `--global`。
 - 默认分支名固定为 `main`。
 - 提交信息使用**中文**，与本仓库文档语言一致。
@@ -35,7 +35,7 @@
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && test -d .git && echo "ALREADY A REPO" || echo "not a repo yet"
+cd $REPO && test -d .git && echo "ALREADY A REPO" || echo "not a repo yet"
 ```
 Expected: `not a repo yet`
 
@@ -56,7 +56,7 @@ preset/node_modules/
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git init -b main -q . \
+cd $REPO && git init -b main -q . \
   && git config user.name "goalizc" \
   && git config user.email "goalizc@localhost" \
   && echo "init ok"
@@ -67,7 +67,7 @@ Expected: `init ok`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git config user.name && git config user.email && git symbolic-ref --short HEAD && git check-ignore -v preset/node_modules && echo ".tmp-full" | git check-ignore --stdin -v
+cd $REPO && git config user.name && git config user.email && git symbolic-ref --short HEAD && git check-ignore -v preset/node_modules && echo ".tmp-full" | git check-ignore --stdin -v
 ```
 Expected（四项依次）：
 ```
@@ -82,14 +82,14 @@ main
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git add -A --dry-run 2>/dev/null | grep -c "preset/node_modules" || true
+cd $REPO && git add -A --dry-run 2>/dev/null | grep -c "preset/node_modules" || true
 ```
 Expected: `0`
 
 - [ ] **Step 6: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && git add .gitignore && git commit -q -m "chore: 初始化仓库并忽略机器本地依赖与临时目录" && git log --oneline
+cd $REPO && git add .gitignore && git commit -q -m "chore: 初始化仓库并忽略机器本地依赖与临时目录" && git log --oneline
 ```
 Expected: 一行，形如 `xxxxxxx chore: 初始化仓库并忽略机器本地依赖与临时目录`
 
@@ -109,7 +109,7 @@ Expected: 一行，形如 `xxxxxxx chore: 初始化仓库并忽略机器本地�
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && ls LICENSE THIRD-PARTY-NOTICES.md 2>&1 | tail -2
+cd $REPO && ls LICENSE THIRD-PARTY-NOTICES.md 2>&1 | tail -2
 ```
 Expected: 两条 `No such file or directory`（中文环境为 `无法访问`）
 
@@ -194,7 +194,7 @@ SOFTWARE.
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && diff <(sed -n '/^```$/,/^```$/p' THIRD-PARTY-NOTICES.md | sed '1d;$d' | sed -n '/^MIT License$/,$p' | sed '/^```$/d') <(git -C .tmp-full show 'v6.1.1^{}:LICENSE') && echo "LICENSE TEXT MATCHES UPSTREAM"
+cd $REPO && diff <(sed -n '/^```$/,/^```$/p' THIRD-PARTY-NOTICES.md | sed '1d;$d' | sed -n '/^MIT License$/,$p' | sed '/^```$/d') <(git -C .tmp-full show 'v6.1.1^{}:LICENSE') && echo "LICENSE TEXT MATCHES UPSTREAM"
 ```
 Expected: `LICENSE TEXT MATCHES UPSTREAM`
 
@@ -202,7 +202,7 @@ Expected: `LICENSE TEXT MATCHES UPSTREAM`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && head -3 LICENSE && grep -c "Copyright (c) 2026 goalizc" LICENSE
+cd $REPO && head -3 LICENSE && grep -c "Copyright (c) 2026 goalizc" LICENSE
 ```
 Expected:
 ```
@@ -215,7 +215,7 @@ Copyright (c) 2026 goalizc
 - [ ] **Step 6: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && git add LICENSE THIRD-PARTY-NOTICES.md && git commit -q -m "chore: 添加 MIT 许可与第三方声明" && git log --oneline | head -1
+cd $REPO && git add LICENSE THIRD-PARTY-NOTICES.md && git commit -q -m "chore: 添加 MIT 许可与第三方声明" && git log --oneline | head -1
 ```
 Expected: 形如 `xxxxxxx chore: 添加 MIT 许可与第三方声明`
 
@@ -236,7 +236,7 @@ Expected: 形如 `xxxxxxx chore: 添加 MIT 许可与第三方声明`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git -C .tmp-full rev-parse 'v6.1.1^{}^{tree}' && git -C .tmp-full rev-list --count --all
+cd $REPO && git -C .tmp-full rev-parse 'v6.1.1^{}^{tree}' && git -C .tmp-full rev-list --count --all
 ```
 Expected:
 ```
@@ -245,7 +245,7 @@ Expected:
 ```
 若 `.tmp-full` 缺失，先重建（约 278 MiB，需数分钟）：
 ```bash
-cd /home/goalizc/superpowers-dsh && rm -rf .tmp-full && git clone --mirror https://github.com/obra/superpowers .tmp-full
+cd $REPO && rm -rf .tmp-full && git clone --mirror https://github.com/obra/superpowers .tmp-full
 ```
 
 - [ ] **Step 2: 把两处 DSH 改动备份到仓库之外**
@@ -254,7 +254,7 @@ subtree 导入会用上游原始内容覆盖 `preset/skills/`，必须先备份�
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && mkdir -p .tmp-overlay/using-superpowers/references \
+cd $REPO && mkdir -p .tmp-overlay/using-superpowers/references \
   && cp preset/skills/using-superpowers/SKILL.md .tmp-overlay/using-superpowers/SKILL.md \
   && cp preset/skills/using-superpowers/references/dsh-tools.md .tmp-overlay/using-superpowers/references/dsh-tools.md \
   && echo "overlay backed up" && ls -R .tmp-overlay
@@ -265,7 +265,7 @@ Expected: `overlay backed up`，并列出这两个文件
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && grep -n "dsh-tools.md" .tmp-overlay/using-superpowers/SKILL.md && wc -l < .tmp-overlay/using-superpowers/references/dsh-tools.md
+cd $REPO && grep -n "dsh-tools.md" .tmp-overlay/using-superpowers/SKILL.md && wc -l < .tmp-overlay/using-superpowers/references/dsh-tools.md
 ```
 Expected:
 ```
@@ -284,8 +284,8 @@ Expected:
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && rm -rf .tmp-snap && git init -q .tmp-snap \
-  && git -C .tmp-snap fetch -q /home/goalizc/superpowers-dsh/.tmp-full tag v6.1.1 \
+cd $REPO && rm -rf .tmp-snap && git init -q .tmp-snap \
+  && git -C .tmp-snap fetch -q $REPO/.tmp-full tag v6.1.1 \
   && git -C .tmp-snap checkout -q v6.1.1 \
   && git -C .tmp-snap subtree split --prefix=skills -b promoted >/dev/null 2>&1 \
   && echo "snapshot ok"
@@ -296,7 +296,7 @@ Expected: `snapshot ok`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && diff <(git -C .tmp-full ls-tree -r 'v6.1.1^{}:skills' --name-only | sort) <(git -C .tmp-snap ls-tree -r promoted --name-only | sort) && echo "PROMOTED TREE MATCHES UPSTREAM skills/" || echo "MISMATCH - STOP"
+cd $REPO && diff <(git -C .tmp-full ls-tree -r 'v6.1.1^{}:skills' --name-only | sort) <(git -C .tmp-snap ls-tree -r promoted --name-only | sort) && echo "PROMOTED TREE MATCHES UPSTREAM skills/" || echo "MISMATCH - STOP"
 ```
 Expected: `PROMOTED TREE MATCHES UPSTREAM skills/`（两边均为 48 文件、14 个技能目录）
 
@@ -310,7 +310,7 @@ subtree add 会在当前 HEAD 之上创建提交，因此这里**不需要**空�
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && rm -rf preset/skills \
+cd $REPO && rm -rf preset/skills \
   && git subtree add --prefix=preset/skills .tmp-snap promoted -m "feat: 经 subtree 导入上游 Superpowers v6.1.1 技能" > /tmp/st.log 2>&1
 echo "EXIT=$?"; tail -2 /tmp/st.log; ls preset/skills | head -16
 ```
@@ -320,7 +320,7 @@ Expected: `EXIT=0`、`Added dir 'preset/skills'`，并列出 14 个技能目录�
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && grep -c "dsh-tools.md" preset/skills/using-superpowers/SKILL.md; ls preset/skills/using-superpowers/references/
+cd $REPO && grep -c "dsh-tools.md" preset/skills/using-superpowers/SKILL.md; ls preset/skills/using-superpowers/references/
 ```
 Expected: `grep -c` 输出 `0`（上游原文没有该指针行），且 `references/` 里**没有** `dsh-tools.md`
 
@@ -328,7 +328,7 @@ Expected: `grep -c` 输出 `0`（上游原文没有该指针行），且 `refere
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && cp .tmp-overlay/using-superpowers/SKILL.md preset/skills/using-superpowers/SKILL.md \
+cd $REPO && cp .tmp-overlay/using-superpowers/SKILL.md preset/skills/using-superpowers/SKILL.md \
   && cp .tmp-overlay/using-superpowers/references/dsh-tools.md preset/skills/using-superpowers/references/dsh-tools.md \
   && echo "overlay restored"
 ```
@@ -340,7 +340,7 @@ Expected: `overlay restored`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && rm -rf .tmp-verify && mkdir .tmp-verify \
+cd $REPO && rm -rf .tmp-verify && mkdir .tmp-verify \
   && git -C .tmp-full archive 'v6.1.1^{}:skills' | tar -x -C .tmp-verify \
   && echo "上游 skills/ 文件数: $(find .tmp-verify -type f | wc -l)" \
   && diff -rq .tmp-verify preset/skills; echo "差异行数: $(diff -rq .tmp-verify preset/skills 2>/dev/null | wc -l)"
@@ -355,7 +355,7 @@ Expected：上游 48 文件；**恰好两行**差异，差异行数为 `2`：
 - [ ] **Step 10: 提交两处 DSH 改动**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && git add preset/skills/using-superpowers/SKILL.md preset/skills/using-superpowers/references/dsh-tools.md \
+cd $REPO && git add preset/skills/using-superpowers/SKILL.md preset/skills/using-superpowers/references/dsh-tools.md \
   && git commit -q -m "feat: 保留 DSH 平台适配（工具映射与指针行）" && git log --oneline | head -2
 ```
 Expected: 两行，首行为 `feat: 保留 DSH 平台适配（工具映射与指针行）`
@@ -364,7 +364,7 @@ Expected: 两行，首行为 `feat: 保留 DSH 平台适配（工具映射与指
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && rm -rf .tmp-snap .tmp-verify .tmp-overlay && git status --porcelain && echo "--- tracked node_modules count:" && git ls-files preset/node_modules | wc -l
+cd $REPO && rm -rf .tmp-snap .tmp-verify .tmp-overlay && git status --porcelain && echo "--- tracked node_modules count:" && git ls-files preset/node_modules | wc -l
 ```
 Expected: `git status --porcelain` 无输出；`tracked node_modules count:` 为 `0`
 
@@ -385,7 +385,7 @@ Expected: `git status --porcelain` 无输出；`tracked node_modules count:` 为
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git grep -c "/home/goalizc\|/mnt/e" -- docs evidence preset/SYNC.md
+cd $REPO && git grep -c "$HOME\|/mnt/e" -- docs evidence preset/SYNC.md
 ```
 Expected:
 ```
@@ -396,18 +396,18 @@ preset/SYNC.md:1
 
 - [ ] **Step 2: 用 sed 做占位符替换（顺序重要：先长后短）**
 
-`/home/goalizc/superpowers-dsh` 必须早于 `/home/goalizc/ardupilot`，否则会被后者或 `$HOME` 规则切碎。替换串一律用单引号，避免 shell 展开 `$`。
+`$REPO` 必须早于 `$ARDUPLOT_WS`，否则会被后者或 `$HOME` 规则切碎。替换串一律用单引号，避免 shell 展开 `$`。
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && for f in docs/feasibility-report.md evidence/VERIFICATION.md preset/SYNC.md; do
+cd $REPO && for f in docs/feasibility-report.md evidence/VERIFICATION.md preset/SYNC.md; do
   sed -i \
-    -e 's|/home/goalizc/superpowers-dsh|$REPO|g' \
-    -e 's|/home/goalizc/\.dsh|$DSH_HOME|g' \
-    -e 's|/home/goalizc/ardupilot|$ARDUPLOT_WS|g' \
+    -e 's|$REPO|$REPO|g' \
+    -e 's|$HOME/\.dsh|$DSH_HOME|g' \
+    -e 's|$ARDUPLOT_WS|$ARDUPLOT_WS|g' \
     -e 's|/mnt/e/project/superpowers|$UPSTREAM|g' \
     -e 's|http://127\.0\.0\.1:3080|$DSH_WEB_URL|g' \
-    -e 's|/home/goalizc|$HOME|g' \
+    -e 's|$HOME|$HOME|g' \
     "$f"
 done && echo "replacements applied"
 ```
@@ -417,7 +417,7 @@ Expected: `replacements applied`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git grep -n "/home/goalizc\|/mnt/e\|127\.0\.0\.1" -- docs evidence preset/SYNC.md; echo "exit=$?"
+cd $REPO && git grep -n "$HOME\|/mnt/e\|127\.0\.0\.1" -- docs evidence preset/SYNC.md; echo "exit=$?"
 ```
 Expected: 无匹配输出，`exit=1`
 
@@ -425,7 +425,7 @@ Expected: 无匹配输出，`exit=1`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git grep -c '\$REPO\|\$DSH_HOME\|\$UPSTREAM\|\$ARDUPLOT_WS\|\$DSH_WEB_URL' -- docs evidence preset/SYNC.md
+cd $REPO && git grep -c '\$REPO\|\$DSH_HOME\|\$UPSTREAM\|\$ARDUPLOT_WS\|\$DSH_WEB_URL' -- docs evidence preset/SYNC.md
 ```
 Expected: 三份文件均有非零计数（报告最多，SYNC.md 为 1）
 
@@ -453,14 +453,14 @@ Expected: 三份文件均有非零计数（报告最多，SYNC.md 为 1）
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && head -12 docs/feasibility-report.md && echo "=====" && head -8 evidence/VERIFICATION.md && echo "=====" && cat preset/SYNC.md
+cd $REPO && head -12 docs/feasibility-report.md && echo "=====" && head -8 evidence/VERIFICATION.md && echo "=====" && cat preset/SYNC.md
 ```
 Expected: 三份文件标题与表格结构完好，占位符出现在原路径位置
 
 - [ ] **Step 7: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && git add docs/feasibility-report.md evidence/VERIFICATION.md preset/SYNC.md \
+cd $REPO && git add docs/feasibility-report.md evidence/VERIFICATION.md preset/SYNC.md \
   && git commit -q -m "docs: 本机路径占位符化以便公开分发" && git log --oneline | head -1
 ```
 Expected: 形如 `xxxxxxx docs: 本机路径占位符化以便公开分发`
@@ -486,7 +486,7 @@ Expected: 形如 `xxxxxxx docs: 本机路径占位符化以便公开分发`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git add README.md preset/preset.yml preset/agent.cordis.yml preset/bootstrap.md preset/plugins scripts docs evidence \
+cd $REPO && git add README.md preset/preset.yml preset/agent.cordis.yml preset/bootstrap.md preset/plugins scripts docs evidence \
   && git commit -q -m "docs: 纳入 README、可行性报告、验证记录、设计与实施计划" && git log --oneline
 ```
 Expected: 5 行提交历史
@@ -495,7 +495,7 @@ Expected: 5 行提交历史
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git status --porcelain; echo "exit=$?"
+cd $REPO && git status --porcelain; echo "exit=$?"
 ```
 Expected: 无输出，`exit=0`
 
@@ -503,7 +503,7 @@ Expected: 无输出，`exit=0`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git ls-files | wc -l
+cd $REPO && git ls-files | wc -l
 ```
 Expected: 约 62（49 skills + 13 其他；允许 ±2 的浮动，但**不得**包含任何 `preset/node_modules` 条目）
 
@@ -511,15 +511,19 @@ Expected: 约 62（49 skills + 13 其他；允许 ±2 的浮动，但**不得**�
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git ls-files preset/node_modules | wc -l
+cd $REPO && git ls-files preset/node_modules | wc -l
 ```
 Expected: `0`
 
-- [ ] **Step 5: 断言全仓库无本机路径残留**
+- [ ] **Step 5: 断言被分发内容无本机路径残留**
+
+作用域**刻意排除 `docs/superpowers/{specs,plans}/`**：这两份是实现文档，必须字面写出被替换的路径与 `sed` 规则本身，否则无法理解与复现。它们记录"路径曾被替换"这一事实，不是泄漏。
+
+断言也**不含 `127.0.0.1`**：`preset/skills/**` 是上游逐字副本，其中 brainstorming 的配套脚本本就以 `127.0.0.1` 作默认绑定地址，属上游内容而非本机标识；本仓库自己写下的 `127.0.0.1:3080` 已替换为 `$DSH_WEB_URL`。
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && git grep -n "/home/goalizc\|/mnt/e" -- . ; echo "exit=$?"
+cd $REPO && git grep -n "/home/[a-z]\|/mnt/[a-z]/" -- README.md docs/feasibility-report.md evidence preset scripts; echo "exit=$?"
 ```
 Expected: 无输出，`exit=1`
 
@@ -529,7 +533,7 @@ Expected: 无输出，`exit=1`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh/preset/plugins/superpowers-bootstrap && node selftest.mjs
+cd $REPO/preset/plugins/superpowers-bootstrap && node selftest.mjs
 ```
 Expected: `selftest OK: 6 assertions groups passed`（并打印 bootstrap bytes）
 
@@ -537,7 +541,7 @@ Expected: `selftest OK: 6 assertions groups passed`（并打印 bootstrap bytes�
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && wc -c < preset/bootstrap.md && node -e "const y=require('node:fs').readFileSync('preset/agent.cordis.yml','utf8');const n=(y.match(/^- id:/gm)||[]).length;console.log('top-level rows:',n)"
+cd $REPO && wc -c < preset/bootstrap.md && node -e "const y=require('node:fs').readFileSync('preset/agent.cordis.yml','utf8');const n=(y.match(/^- id:/gm)||[]).length;console.log('top-level rows:',n)"
 ```
 Expected: `9104`（bootstrap 字节数）与 `top-level rows: 19`
 
@@ -545,7 +549,7 @@ Expected: `9104`（bootstrap 字节数）与 `top-level rows: 19`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && rm -rf .tmp-verify && mkdir .tmp-verify \
+cd $REPO && rm -rf .tmp-verify && mkdir .tmp-verify \
   && git -C .tmp-full archive 'v6.1.1^{}:skills' | tar -x -C .tmp-verify \
   && diff -rq .tmp-verify preset/skills | wc -l && rm -rf .tmp-verify
 ```
@@ -557,7 +561,7 @@ Expected: `2`
 
 Run:
 ```bash
-cd /home/goalizc/superpowers-dsh && rm -rf .tmp-full && ls -a | grep '^\.tmp' ; echo "临时目录已清（无输出为正常）"
+cd $REPO && rm -rf .tmp-full && ls -a | grep '^\.tmp' ; echo "临时目录已清（无输出为正常）"
 ```
 Expected: 无 `.tmp-*` 残留
 
@@ -565,6 +569,6 @@ Expected: 无 `.tmp-*` 残留
 
 Run（仅打印，不推送）：
 ```bash
-cd /home/goalizc/superpowers-dsh && echo "git remote add origin <你的 GitHub 仓库 URL>" && echo "git push -u origin main" && git log --oneline
+cd $REPO && echo "git remote add origin <你的 GitHub 仓库 URL>" && echo "git push -u origin main" && git log --oneline
 ```
 Expected: 打印两条指引与提交历史
