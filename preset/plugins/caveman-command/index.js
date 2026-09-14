@@ -40,8 +40,34 @@ const CAVEMAN_LEVELS = Object.freeze([
   'off',
 ])
 
-/** The level a session starts at, matching the injected default. */
+/**
+ * The level a session starts at, matching the injected default.
+ *
+ * The authoritative copy of this value for the model is the "Caveman output
+ * style" section of the generated `bootstrap.md`; `scripts/build-bootstrap.sh`
+ * writes it, and `scripts/caveman-default-level.test.mjs` ties the copies in
+ * `bootstrap.md`, `agent.cordis.yml` and this module together — so a one-sided
+ * edit fails `npm test` instead of silently disagreeing.
+ */
 const DEFAULT_LEVEL = 'full'
+
+/**
+ * The level each agent has set, keyed by `invocation.agent.id`.
+ *
+ * Without this, a bare `/caveman` could only ever report `DEFAULT_LEVEL` and
+ * would contradict what the user just set: the announcement the `set` path
+ * writes is a message in the conversation, so the plugin has to remember the
+ * level here to echo it back. Keyed per agent for the same reason the harness
+ * keys its own per-session state by session: one standing preset mount serves
+ * every session in the process.
+ *
+ * Lifetime is this process. After a restart (including a resumed session in a
+ * new process) the map is empty again, so a bare `/caveman` falls back to
+ * `DEFAULT_LEVEL` even though the session's own messages still carry the level
+ * the model is following. That gap is display-only: the model's behaviour comes
+ * from the durable announcement, never from this map.
+ */
+const levelByAgent = new Map()
 
 /**
  * Deep-freeze a message the way the harness publishes its own messages.
@@ -95,9 +121,13 @@ function executeCavemanCommand(invocation) {
   const command = parseLevel(invocation.rawInput)
 
   if (command.kind === 'show') {
+    // Report what this agent is on NOW: what it set, else the start level.
+    const set = levelByAgent.get(invocation.agent.id)
+    const level = set ?? DEFAULT_LEVEL
+    const origin = set === undefined ? ' (default)' : ''
     return {
       kind: 'success',
-      text: [`Caveman output style: ${DEFAULT_LEVEL} (default)`, '', USAGE].join('\n'),
+      text: [`Caveman output style: ${level}${origin}`, '', USAGE].join('\n'),
     }
   }
 
@@ -109,7 +139,10 @@ function executeCavemanCommand(invocation) {
   }
 
   // Durable announcement: the next model turn reads the level from the
-  // conversation, exactly as the injected default does.
+  // conversation, exactly as the injected default does. Recorded here too so a
+  // later bare `/caveman` reports this agent's current level.
+  levelByAgent.set(invocation.agent.id, command.level)
+
   const announcement =
     command.level === 'off'
       ? 'Caveman output style: off. Answer in normal prose from now on, and do not load the `caveman` skill.'
