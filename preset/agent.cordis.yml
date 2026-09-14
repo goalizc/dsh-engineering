@@ -257,10 +257,10 @@
 # walk — which is why the plugin can ship inside the preset. It publishes no
 # service and registers no tool, so it needs no `isolate` realm.
 #
-# The plugin reads `bootstrap.md` (see this file's header). Its runtime imports
-# resolve through `node_modules/` beside this composition, a symlink to the
-# harness's own dependency tree: a locally authored preset lives under the
-# user's home, where Node's upward walk never reaches the harness's packages.
+# The plugin reads `bootstrap.md` (see this file's header). It imports nothing
+# from the harness — the message id it needs comes from `node:crypto` — so the
+# preset is fully self-contained and needs no `node_modules` link into the
+# harness's dependency tree.
 - id: superpowers-bootstrap
   name: './plugins/superpowers-bootstrap/index.js'
 

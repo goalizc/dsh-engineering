@@ -1,9 +1,11 @@
 /**
  * Self-test for the Superpowers bootstrap plugin.
  *
- * Runs with the harness's own Node, from this preset's plugin directory, so the
- * `@deepseek-ai/dsh-llm` import resolves through the same `node_modules` link
- * the production loader uses. No test framework: it asserts and exits non-zero.
+ * Runs with the harness's own Node, from this preset's plugin directory. The
+ * plugin imports nothing from the harness — the `createUserMessage` helper it
+ * uses is self-contained — so this test needs no `node_modules` link and passes
+ * with no harness packages on the resolution path. No test framework: it
+ * asserts and exits non-zero.
  *
  * The test does not run a real agent. It drives the plugin's `agent/pre-step`
  * listener with synthetic decisions and asserts the three porting-contract
@@ -14,9 +16,8 @@
  */
 
 import { strict as assert } from 'node:assert'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
 
-import { BOOTSTRAP_MARKER, apply, name } from './index.js'
+import { BOOTSTRAP_MARKER, apply, createUserMessage, name } from './index.js'
 
 /** Capture the single listener the plugin installs. */
 const listeners = []

@@ -30,11 +30,46 @@
  */
 
 import { readFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+
+/**
+ * Cordis plugin that injects one user-role message during `agent/pre-step`.
+ *
+ * This preset ships standalone: it must not import the harness's own packages
+ * (`@deepseek-ai/dsh-llm`), because a preset under the user's home has no
+ * `node_modules` walk that reaches them. The two helpers below replicate the
+ * shape `@deepseek-ai/dsh-llm`'s `createUserMessage` produces — `role`,
+ * `content`, `source`, and a fresh `id` — so the injected message stays wire-
+ * compatible without any runtime dependency on the harness.
+ */
 
 /** Cordis plugin name. */
 const name = 'superpowers-bootstrap'
+
+/** Deep-freeze a message the way the harness publishes its own messages. */
+function deepFreeze(value) {
+  if (value instanceof Object && !Object.isFrozen(value)) {
+    Object.freeze(value)
+    for (const key of Object.getOwnPropertyNames(value)) deepFreeze(value[key])
+  }
+  return value
+}
+
+/**
+ * Build one immutable user-role message with a fresh identity, matching the
+ * harness's `createUserMessage`. Uses Node's own UUID so no harness package is
+ * imported.
+ */
+function createUserMessage(input) {
+  return deepFreeze(
+    structuredClone({
+      ...input,
+      role: 'user',
+      id: randomUUID(),
+    }),
+  )
+}
 
 /**
  * The stable marker of an injected bootstrap.
@@ -124,4 +159,4 @@ function apply(ctx) {
   })
 }
 
-export { BOOTSTRAP_MARKER, apply, name }
+export { BOOTSTRAP_MARKER, apply, createUserMessage, name }

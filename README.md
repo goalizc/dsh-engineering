@@ -19,8 +19,7 @@ superpowers-dsh/
 │   │   ├── index.js                 # 注入插件（agent/pre-step，幂等，压缩后自愈）
 │   │   ├── package.json
 │   │   └── selftest.mjs             # 无宿主依赖的回归测试
-│   ├── skills/                      # vendored：上游 14 个技能原样 + 一份 dsh-tools.md
-│   └── node_modules -> harness      # 符号链接，让本地插件能 import harness 自带依赖
+│   └── skills/                      # vendored：上游 14 个技能原样 + 一份 dsh-tools.md
 └── scripts/
     ├── sync-superpowers-skills.sh   # 从上游检出同步 skills/ 并重打 DSH 指针
     ├── build-bootstrap.sh           # 重建 bootstrap.md（带自检）
@@ -35,7 +34,7 @@ scripts/install.sh                  # 默认：真实目录 + 逐项符号链接
 scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器）
 ```
 
-`install.sh` 会自动重建机器本地依赖链接（`preset/node_modules/@deepseek-ai` → 已安装 harness 的依赖树）并在末尾运行插件自测，失败即中止安装。**换机后无需手动处理依赖，重新 clone 后直接跑 `install.sh` 即可。**
+`install.sh` 在末尾自动运行插件自测，失败即中止安装。**换机后无需任何手工依赖处理，重新 clone 后直接跑 `install.sh` 即可。**
 
 之后**新建**一个会话，在模式选择器里选 `Superpowers 模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建。
 
@@ -43,7 +42,7 @@ scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器
 
 preset 发现用 `readdir(root, { withFileTypes: true })` 并只接受 `isDirectory()` 为真的条目。**指向目录的符号链接会被静默跳过**（`isDirectory()` 返回 false），所以不能把 `~/.dsh/.agent-presets/superpowers` 直接做成指向本检出的符号链接。`install.sh` 因此创建一个真实目录，内部每个条目是符号链接——既被发现，又保持改动即时生效。
 
-`preset/node_modules/@deepseek-ai` 指向已安装 harness 的依赖树：本地创作的 preset 位于用户家目录，Node 的 `node_modules` 上行查找到不了 harness 自己的包，而这个插件需要 `@deepseek-ai/dsh-llm` 的 `createUserMessage`。所以这个 preset 是**机器本地**的，检出本身换机器需重跑 `install.sh`。
+这个 preset 是**自包含、跨机器可移植**的：它的 bootstrap 插件不 import harness 任何包（构造注入消息用 `node:crypto` 的 `randomUUID` 复刻 `createUserMessage` 的形状），因此不需要指向 harness 依赖树的 `node_modules` 链接——装到任何装有 DSH 的机器都能直接跑。
 
 ## 验证
 

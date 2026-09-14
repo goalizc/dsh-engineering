@@ -6,7 +6,6 @@
   "description": "Injects the Superpowers bootstrap as durable user-role context for agents on this preset.",
   "main": "index.js",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2",
-    "@deepseek-ai/dsh-llm": "*"
+    "@deepseek-ai/cordis": "^4.0.2"
   }
 }
