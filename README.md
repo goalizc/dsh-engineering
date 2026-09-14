@@ -68,9 +68,11 @@ engineering-dsh/
 │   ├── build-manifest.mjs           # 生成逐文件 sha-256 清单
 │   ├── plant-core.mjs               # 植入引擎（link / copy 两种策略）
 │   ├── install.sh                   # 投影到 ${DSH_HOME}/.agent-presets/engineering
+│   ├── verify-composition.mjs       # 第 2a 层：用 harness 自带 discoverPresets 查组合健康
 │   ├── index.test.mjs               # 安装器插件测试
 │   ├── plant-core.test.mjs          # 植入引擎测试
-│   └── caveman-default-level.test.mjs  # 断言插件默认级别 == build-bootstrap 注入的级别
+│   ├── caveman-default-level.test.mjs  # 三个家的默认级别 + 插件级别名 == vendored 技能
+│   └── vendored-skills.test.mjs     # 白名单 caveman 技能必须在（半同步树不得通过 npm test）
 ├── docs/                            # 设计与可行性记录（含上游的 skills 撰写约定）
 ├── evidence/VERIFICATION.md         # 历史验证记录
 └── .cache/                          # sync 自管的上游检出（gitignore，可重建）
@@ -132,39 +134,65 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 
 ## 验证
 
-三层，从便宜到昂贵。第 1 层在本仓库可直接跑；第 2 层需要本会话之外的探针工具；第 3 层不是自动化的。
+四步，从便宜到昂贵：第 1 层与**第 2a 层在本仓库可直接跑**；第 2b 层需要本会话之外的探针工具；第 3 层不是自动化的。
 
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 15 pass / 0 fail
+npm test          # 18 pass / 0 fail
 ```
 
-这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 默认级别与 bootstrap 注入值一致）以及 `preset/plugins/*/*.test.mjs`（两个插件的自测）。两个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
+这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性）以及 `preset/plugins/*/*.test.mjs`（两个插件的自测）。两个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
 
 ```sh
 node preset/plugins/bootstrap/bootstrap.test.mjs
 node preset/plugins/caveman-command/caveman-command.test.mjs
 ```
 
-bootstrap 自测断言移植契约的三条性质：首次注入一次、不重复注入、压缩丢掉后重新注入；另外覆盖 user 角色与 plugin 来源标记、被拒绝的步、空步、已有消息的保留顺序。caveman 自测覆盖 7 个级别的解析往返、注册形状、`/caveman` 裸调用只显示不注入、非法输入报错且不注入。
+同一层还有一条不需要 harness 的静态检查——**产品名残留**（旧 id 的具体串）与上游署名：
 
-**2. 组合挂载与技能目录（需要用本会话之外的探针工具）**
+```sh
+# 代码与配置里旧 id 残留：期望无输出（git grep 只搜已跟踪文件，账本/缓存天然排除）
+git grep -nE 'superpowers-bootstrap|superpowers-installer|@superpowers-dsh|Superpowers 模式|plugins/superpowers-bootstrap|destRoot/superpowers|agent-presets/superpowers|dsh-superpowers-bootstrap' \
+  -- ':!docs' ':!evidence' ':!preset/skills' ':!scripts/sync-superpowers-skills.sh' ':!README.md'
+# 上游署名仍在：期望 3 个文件各有命中
+git grep -c 'obra/superpowers' -- README.md THIRD-PARTY-NOTICES.md preset/SYNC.md
+```
 
-在本仓库里**没有**可用的挂载探针，所以这一步无法作为本仓库的自动化断言：
+排除项逐条：`docs/`、`evidence/` 是 spec §5.3 裁定冻结的历史记录（记录的是当时真实跑过的旧名命令），`preset/skills/` 是上游正文，`scripts/sync-superpowers-skills.sh` 的名字取自上游；README 的命中只出现在「从旧 id `superpowers` 升级」一节——那里必须写出旧 id 才能给出迁移步骤。
+
+bootstrap 自测断言移植契约的三条性质：首次注入一次、不重复注入、压缩丢掉后重新注入；另外覆盖 user 角色与 plugin 来源标记、被拒绝的步、空步、已有消息的保留顺序。caveman 自测覆盖 7 个级别的解析往返（名字钉死字面量）、注册形状、`/caveman` 裸调用报**当前**级别且不注入、级别的按会话隔离、非法输入报错且不注入。
+
+**2a. 组合健康（本仓库可跑，需要机器上装了 harness）**
+
+```sh
+scripts/install.sh                                  # 或已装好旧目录
+node scripts/verify-composition.mjs                 # 默认查 ${DSH_HOME:-~/.dsh}/.agent-presets
+```
+
+它调的是 harness **自己的** `discoverPresets`（与模式选择器读的是同一个名单），harness 位置由 `dsh` 启动器 / `--harness-base` / `DSH_HARNESS_BASE` 解析。期望输出：
+
+```
+roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
+2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
+```
+
+`broken: null` 表示组合 YAML 合 loader 语法、每条行都能解析（`@deepseek-ai/*` 包在同一套 `node_modules` 上行查找里找得到，`./plugins/...` 相对行指向的文件存在）。**它不等于挂载**：discovery 刻意不 import 任何插件，所以它不跑 `standingKeyFor`、不求值行配置、不检查 realm、不断言技能目录——这些属于 2b。
+
+**2b. 真挂载与技能目录（残余缺口，需要用本仓库之外的探针）**
 
 - `sp_probe validate=engineering` → 应得 `MOUNT OK: engineering`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）
 - `sp_verify preset=engineering cwd=<workspace>` → 断言该 preset 作用域下的技能目录
 
 **3. 端到端（人类验收，唯一的最终证据）**
 
-前两层都不证明"模型真的会按这个模式行动"。那一步只能由人做：新建会话选 `工程模式`，发：
+前三步都不证明"模型真的会按这个模式行动"。那一步只能由人做：新建会话选 `工程模式`，发：
 
 > Let's make a react todo list
 
 期望：模型**在写任何代码之前**先加载 `brainstorming` 技能（官方完成定义里的验收用例），且回复默认即为压缩风格。随后试 `/caveman off` 与 `/caveman ultra`，观察表达风格确实变化。
 
-**本项目目前的验证状态：只跑过第 1 层。第 2、3 层都是待办的人类步骤，没有被验证过，不要当成已通过。**
+**本项目目前的验证状态：第 1 层与第 2a 层都实跑过（命令与真实输出见 `evidence/VERIFICATION.md`）；2b 与第 3 层尚未验证，不要当成已通过。**
 
 ## 设计要点
 
@@ -184,6 +212,7 @@ bootstrap 自测断言移植契约的三条性质：首次注入一次、不重�
 | 可视化伴侣 | brainstorming 的可选本地服务器可用 `bash run_in_background` 起；但要人类自己打开 URL。遥测可用 `SUPERPOWERS_DISABLE_TELEMETRY=1` 关闭 |
 | 不承诺硬性门禁 | DSH 没有能真正阻断"模型跳过技能直接写代码"的原语。本模式是强引导 + 可观察性，不是强制流程 |
 | 级别切换依赖本仓库插件 | `/caveman` 是本仓库实现；上游的 slash command 形态在 DSH 不适用，删掉这个插件级别切换即失效 |
+| 裸 `/caveman` 的"当前级别"只在进程内记得 | 级别按会话存在插件的内存里（`invocation.agent.id` 为键），重启/新进程后裸 `/caveman` 回落显示默认 `full`。级别本身不丢——它写在会话的持久消息里，模型行为始终以那条公告为准，所以这是显示层缺口 |
 | 上游同步是手动的 | 没有定时任务也没有 CI：运行两个 sync 脚本，然后 `build-bootstrap.sh` 与 `install.sh` |
 
 ## 上游与许可

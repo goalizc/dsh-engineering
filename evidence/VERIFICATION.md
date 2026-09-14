@@ -125,3 +125,70 @@ ROOT=$REPO
 #    sp_probe  validate=superpowers
 #    sp_verify preset=superpowers cwd=$ARDUPLOT_WS
 ```
+
+---
+
+## 2026-09-14 最终全分支评审修复后的复验（新增第 2a 层）
+
+> 本节成文于 2026-09-14，preset id 已是 `engineering`；上文的 2026-09-12 记录保持原样。
+> 约定同上：`$REPO` 本仓库根。安装验证一律使用仓库内的临时 `DSH_HOME`（`$REPO/.tmp-*`），
+> 跑完即删，不触碰真实的 `~/.dsh`；harness 装在发行默认位置，故 harness base 是绝对路径。
+
+### 第 1 层：`npm test`
+
+```
+$ npm test
+ℹ tests 18
+ℹ pass 18
+ℹ fail 0
+```
+
+`pretest` 先重建 `preset/.manifest.json`。计数随收编的断言数变化（本次修复又加了 3 条），
+契约是 **`0 failed`**。
+
+### 第 2a 层：组合健康（harness 自带的 `discoverPresets`，本仓库可跑）
+
+```
+$ DSH_HOME=$REPO/.tmp-2a scripts/install.sh
+$ DSH_HOME=$REPO/.tmp-2a node scripts/verify-composition.mjs
+composition health (layer 2a, harness discoverPresets)
+  preset root  : $REPO/.tmp-2a/.agent-presets (trust: user)
+  harness base : file:///usr/lib/node_modules/@deepseek-ai/dsh/
+  discovery    : <harness>/node_modules/@deepseek-ai/dsh-agent-presets/lib/index.js
+  roster       : [{"id":"engineering","name":"工程模式","order":5,"broken":null,"path":".../engineering/agent.cordis.yml"}]
+
+2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
+EXIT=0
+```
+
+反向取证（把该检查逼到失败，证明它不是恒真断言）：
+
+| 注入的故障 | 关键输出 | EXIT |
+|---|---|---|
+| 一行包名改成不存在的包（`@deepseek-ai/dsh-persona-renamed`） | `2a FAIL: "engineering" is a broken roster row: row "persona" names a plugin that cannot be resolved: …` | 1 |
+| 把组合文件 `agent.cordis.yml` 移走 | `2a FAIL: … the composition file agent.cordis.yml is missing …` | 1 |
+| `--root` 指向未安装该 preset 的目录 | `2a FAIL: no "engineering" preset under …` | 1 |
+
+`broken: null` 的含义与边界：discovery 解析组合的 YAML 方言、跑 `entryListProblem`、逐行解析
+specifier（包名走上行 `node_modules` 查找，`./` 相对行 stat 文件），但**刻意不 import 任何插件**——
+所以它**不是挂载**。`standingKeyFor`、行配置求值、realm 合法性、技能目录断言仍属 2b。
+
+### 其余同时实跑过的检查
+
+- **安装门禁**：`DSH_HOME=$REPO/.tmp-* scripts/install.sh` → EXIT=0、`self-tests: 2 plugin(s) OK`；
+  给 `preset/plugins/caveman-command/caveman-command.test.mjs` 追加一条 `assert.fail` →
+  EXIT=1 且打印 `self-test: caveman-command FAILED — see output above`。临时新增一个无自测的
+  插件目录 → EXIT=1 且打印缺失路径；临时新增一个带自测的插件目录 → 被自动纳入（`3 plugin(s) OK`）。
+- **产品名残留**：`git grep -nE '<旧 id 特征串>' -- ':!docs' ':!evidence' ':!preset/skills' ':!scripts/sync-superpowers-skills.sh' ':!README.md'`
+  → 无输出（代码与配置侧 0 命中）；反向断言 `git grep -c 'obra/superpowers' -- README.md THIRD-PARTY-NOTICES.md preset/SYNC.md` 各非零。命令全文见 README「验证」第 1 层。
+- **shell 语法**：本次改动的 shell 脚本只有 `scripts/install.sh` 与 `scripts/sync-lib.sh`，逐个
+  `bash -n "$f"` → 两者均 OK。（注意 `bash -n a b` 只解析 `a`，`b` 会被当成位置参数——必须逐个跑。）
+- **上游同步端到端**：`scripts/sync-superpowers-skills.sh` → EXIT=0、`skills: 17 skills, 55 files`，
+  且 `preset/skills/**` 与 `preset/bootstrap.md` 相对基线逐字节未变（vendored 树与 pin 一致、
+  DSH 指针重放幂等）；`preset/SYNC.md` 由该次真实同步重写。
+
+### 2b 与第 3 层：仍未验证
+
+与上文 2026-09-12 的「尚未验证」清单一致，其中 2b 的残余部分是**真挂载**（`sp_probe validate=engineering`）
+与**技能目录断言**（`sp_verify preset=engineering cwd=…`）——两者都需要本仓库之外的探针工具；
+第 3 层端到端仍需人类新建会话验收。

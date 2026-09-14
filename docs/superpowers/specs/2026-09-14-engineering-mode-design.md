@@ -271,6 +271,11 @@ node preset/plugins/bootstrap/bootstrap.test.mjs     # 期望 selftest OK
 | 上半段 `grep -rn "superpowers" --include=*` 期望"无产品名遗留" | **按构造不可达**：会计入被 gitignore 的 `.superpowers/sdd/**` 账本，并匹配大量合法上游名（`using-superpowers`、`superpowers:<skill>`、`You have superpowers.`）、上游产物路径 `docs/superpowers/` 与生成物 | 见 E2 |
 | 第 2 层"需要探针"隐含只有探针一条路 | **低估**：harness 自带的 `discoverPresets` 组合健康检查在本仓库可跑，且实测通过 | 见 E3 |
 
+**E1 补记（2026-09-14 最终全分支评审修复后，实测）**：那次修复又收编了 3 条断言
+（`scripts/vendored-skills.test.mjs` 1 条 + `caveman-default-level.test.mjs` 2 条跨文件断言），
+并把插件自测扩到 8 组，故 `npm test` 现在是 **18 passed / 0 failed**。计数随每次收编而变——
+上面 §8 里的数字不是契约，**`0 failed` 才是**。
+
 **E2 — 替代 §8 的改名断言（实测干净）**
 
 ```sh
@@ -289,6 +294,7 @@ git grep -c "obra/superpowers" -- README.md THIRD-PARTY-NOTICES.md preset/SYNC.m
 - **2a（可跑，已实测）**：harness 自带的 roster 健康检查 `discoverPresets([{path:'<tmp>/.agent-presets', trust:'user'}], <已安装 dsh-agent-presets 的 baseUrl>)`。它解析组合的 YAML 方言、跑 `entryListProblem`、并解析**每一行**的 specifier。实测对本设计产出的 link 布局返回 `[{id:"engineering", name:"工程模式", order:5, broken:null}]`。
 - **2b（残余缺口）**：真正的 `standingKeyFor` 挂载（realm 合法性、`inject` 激活、`!!js` 求值）。无探针时不可跑；风险小（与既有 `command-goal` 行同形、不发布服务、首次会话启动即响亮失败）。
 - **第 3 层（端到端）**：`/caveman ultra` 是否真的改变风格。**零执行证据**。可行路径已探明：`headless` 是随发行提供的 profile 模板，配合可写的 `DSH_HOME` 与 `agent-presets.default: engineering`，一次模型调用即可。属人类验收。
+- **2a 的固定入口（最终评审修复后落地）**：该检查已是仓库内脚本 `scripts/verify-composition.mjs`——harness 位置由 `dsh` 启动器 / `--harness-base` / `DSH_HARNESS_BASE` 解析，组合有坏行、组合文件缺失或 preset 未安装时非零退出并打印原因。用法见 README「验证」第 2a 层，真实输出见 `evidence/VERIFICATION.md`。
 
 **E4 — 设计文档未预见的实现期约束（两条，均为实测所得）**
 
