@@ -1,6 +1,6 @@
 # 将 Superpowers 适配并集成为 DSH 新模式 —— 可行性分析报告
 
-> **历史记录**：本报告成文于 2026-09-12，当时该项目名为 `superpowers-dsh`、preset 显示名为 `Superpowers 模式`。此后项目更名为 `engineering-dsh`、显示名为 `工程模式`。正文中的旧名与当时实测的命令输出**保持原样**，以免破坏本文件"命令可复现"的性质。
+> **历史记录**：本报告成文于 2026-09-12，当时该项目名为 `superpowers-dsh`、preset 显示名为 `Superpowers 模式`。此后项目更名为 `dsh-engineering`、显示名为 `工程模式`。正文中的旧名与当时实测的命令输出**保持原样**，以免破坏本文件"命令可复现"的性质。
 
 > **占位符约定**：为便于公开分发，本文件中的本机路径已占位符化——
 > `$REPO` 本仓库根、`$DSH_HOME` DSH 配置目录（默认 `~/.dsh`）、`$ARDUPLOT_WS` 一个使用本 preset 的工作区示例、`$UPSTREAM` 上游 Superpowers 检出、`$DSH_WEB_URL` DSH Web GUI 地址、`$HOME` 用户家目录。

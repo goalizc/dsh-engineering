@@ -1,7 +1,14 @@
 {
-  "name": "@engineering-dsh/engineering-dsh",
+  "name": "@dsh-engineering/dsh-engineering",
   "version": "0.1.0",
   "description": "Superpowers and Caveman skills as a DeepSeek Harness agent preset bundle.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/goalizc/dsh-engineering.git"
+  },
+  "bugs": {
+    "url": "https://github.com/goalizc/dsh-engineering/issues"
+  },
   "type": "module",
   "main": "index.js",
   "files": ["index.js", "cordis.patch.yml", "preset", "scripts/plant-core.mjs", "preset/.manifest.json"],

@@ -28,7 +28,7 @@
 
 ## Global Constraints
 
-- 产品名：preset ID = **`engineering`**，显示名 = **`工程模式`**，npm 包名 = **`@engineering-dsh/engineering-dsh`**，插件目录 = **`preset/plugins/bootstrap/`**。
+- 产品名：preset ID = **`engineering`**，显示名 = **`工程模式`**，npm 包名 = **`@dsh-engineering/dsh-engineering`**，插件目录 = **`preset/plugins/bootstrap/`**。
 - 上游名**不得改动**：`obra/superpowers`、`JuliusBrussee/caveman`、技能名（`using-superpowers`、`sync-superpowers-skills.sh` 等）。
 - `docs/superpowers/` 路径**不得改动**（上游写作规范定的技能产物路径）。
 - 锁定 commit 不得漂移：superpowers `d884ae04edebef577e82ff7c4e143debd0bbec99`，caveman `15581d14007fd01fb3f132016741962f34936ca2`。
@@ -833,10 +833,10 @@ export async function doInstall({ destRoot, name = 'engineering' } = {}) {
 # cordis.patch.yml
 - insert:
     - id: engineering-installer
-      name: '@engineering-dsh/engineering-dsh'
+      name: '@dsh-engineering/dsh-engineering'
 ```
 
-`package.json`：`name` 改 `@engineering-dsh/engineering-dsh`，`description` 改 `"Superpowers and Caveman skills as a DeepSeek Harness agent preset bundle."`，并新增 pretest 钩子（修 P1：干净检出下 `npm test` 因缺 `preset/.manifest.json` 必然失败）：
+`package.json`：`name` 改 `@dsh-engineering/dsh-engineering`，`description` 改 `"Superpowers and Caveman skills as a DeepSeek Harness agent preset bundle."`，并新增 pretest 钩子（修 P1：干净检出下 `npm test` 因缺 `preset/.manifest.json` 必然失败）：
 
 ```json
     "pretest": "npm run build:manifest",
@@ -920,7 +920,7 @@ Expected: `EXIT=0`，`1`
 在 `docs/feasibility-report.md` 的 `# 将 Superpowers 适配并集成为 DSH 新模式 —— 可行性分析报告` 之后、现有"占位符约定"引用块**之前**插入：
 
 ```markdown
-> **历史记录**：本报告成文于 2026-09-12，当时该项目名为 `superpowers-dsh`、preset 显示名为 `Superpowers 模式`。此后项目更名为 `engineering-dsh`、显示名为 `工程模式`。正文中的旧名与当时实测的命令输出**保持原样**，以免破坏本文件"命令可复现"的性质。
+> **历史记录**：本报告成文于 2026-09-12，当时该项目名为 `superpowers-dsh`、preset 显示名为 `Superpowers 模式`。此后项目更名为 `dsh-engineering`、显示名为 `工程模式`。正文中的旧名与当时实测的命令输出**保持原样**，以免破坏本文件"命令可复现"的性质。
 ```
 
 在 `evidence/VERIFICATION.md` 的 `# 验证记录` 之后、现有"占位符约定"引用块**之前**插入：
@@ -964,7 +964,7 @@ cd $REPO && git add -A && git commit -m "refactor: 产品改名 superpowers -> e
 `README.md` 整体替换为下列内容（保留原有技术细节的准确部分，更新名称、技能清单、上游、缓存与命令）：
 
 ````markdown
-# engineering-dsh
+# dsh-engineering
 
 把两套上游技能方法论适配为 **DeepSeek Harness 的一个模式**：`工程模式`。
 
@@ -996,7 +996,7 @@ cd $REPO && git add -A && git commit -m "refactor: 产品改名 superpowers -> e
 ## 目录结构
 
 ```
-engineering-dsh/
+dsh-engineering/
 ├── index.js                         # bundle 安装器插件
 ├── cordis.patch.yml                 # bundle 挂载声明
 ├── preset/                          # 这个目录就是被 DSH 挂载的"模式"

@@ -131,8 +131,8 @@ rule set. Levels: lite, full, ultra, wenyan-lite, wenyan-full, wenyan-ultra, off
 | preset ID | `superpowers` | **`engineering`** |
 | 显示名 | `Superpowers 模式` | **`工程模式`** |
 | 插件目录 | `preset/plugins/superpowers-bootstrap/` | **`preset/plugins/bootstrap/`** |
-| npm 包名 | `@superpowers-dsh/superpowers-dsh` | `@engineering-dsh/engineering-dsh` |
-| 仓库名 | `superpowers-dsh` | `engineering-dsh`（GitHub 侧为人类动作） |
+| npm 包名 | `@superpowers-dsh/superpowers-dsh` | `@dsh-engineering/dsh-engineering` |
+| 仓库名 | `superpowers-dsh` | `dsh-engineering`（GitHub 侧为人类动作） |
 
 ### 5.2 必须改的文件（实测 26 处出现产品名）
 

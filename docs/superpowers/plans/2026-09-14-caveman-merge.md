@@ -36,7 +36,7 @@
 - [ ] **Step 1: 从上游拷贝 3 个技能(数据落地, 无"失败测试"先行——技能为纯数据)**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && \
+cd /home/goalizc/dsh-engineering && \
 for id in caveman caveman-commit caveman-review; do \
   rm -rf "preset/skills/$id" && \
   cp -R "/mnt/e/project/caveman/skills/$id" "preset/skills/" ; done
@@ -58,20 +58,20 @@ done
 
 - [ ] **Step 3: 运行 build-bootstrap.sh 验证通过**
 
-Run: `cd /home/goalizc/superpowers-dsh && bash scripts/build-bootstrap.sh`
+Run: `cd /home/goalizc/dsh-engineering && bash scripts/build-bootstrap.sh`
 Expected: 末行依次输出 `built .../preset/bootstrap.md (... bytes, ... lines)`, 随后无报错; 且 `preset/.manifest.json` 被重新生成(清单文件数应 >56, 因新增技能)。
 
 - [ ] **Step 4: 验证清单确实收录新增技能**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && node -e "const m=require('./preset/.manifest.json');const k=Object.keys(m.files);const ids=['caveman','caveman-commit','caveman-review'];console.log('skills/caveman/SKILL.md in manifest:',k.includes('skills/caveman/SKILL.md'));process.exit(ids.every(i=>k.includes('skills/'+i+'/SKILL.md'))?0:1)"
+cd /home/goalizc/dsh-engineering && node -e "const m=require('./preset/.manifest.json');const k=Object.keys(m.files);const ids=['caveman','caveman-commit','caveman-review'];console.log('skills/caveman/SKILL.md in manifest:',k.includes('skills/caveman/SKILL.md'));process.exit(ids.every(i=>k.includes('skills/'+i+'/SKILL.md'))?0:1)"
 ```
 Expected: `skills/caveman/SKILL.md in manifest: true` 且退出码 0(3 个技能都在清单)。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 printf '%s\n' 'feat: vendored caveman 3 技能并纳入 build-bootstrap 存在断言' > .tmp-msg.txt
 git add preset/skills/caveman preset/skills/caveman-commit preset/skills/caveman-review scripts/build-bootstrap.sh
 git commit -F .tmp-msg.txt && rm -f .tmp-msg.txt
@@ -109,7 +109,7 @@ git commit -F .tmp-msg.txt && rm -f .tmp-msg.txt
 - [ ] **Step 2: 校验 YAML 合法**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && node -e "const y=require('yaml');const p=require('fs').readFileSync('preset/agent.cordis.yml','utf8');const d=y.parse(p);console.log('parse OK, persona exists:', d.some(r=>r.id==='persona'))"
+cd /home/goalizc/dsh-engineering && node -e "const y=require('yaml');const p=require('fs').readFileSync('preset/agent.cordis.yml','utf8');const d=y.parse(p);console.log('parse OK, persona exists:', d.some(r=>r.id==='persona'))"
 ```
 Expected: `parse OK, persona exists: true`(若 `yaml` 包不可用, 用 `node -e "new (require('js-yaml'))..."` 或本仓库已用的解析器, 以能让文件被解析为准)。
 
@@ -118,7 +118,7 @@ Expected: `parse OK, persona exists: true`(若 `yaml` 包不可用, 用 `node -e
 - [ ] **Step 3: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 printf '%s\n' 'feat: persona 注入 caveman 调和声明(默认 lite + 流程产物优先)' > .tmp-msg.txt
 git add preset/agent.cordis.yml && git commit -F .tmp-msg.txt && rm -f .tmp-msg.txt
 ```
@@ -175,21 +175,21 @@ echo "caveman skills: ${#CAVEMAN_IDS[@]} synced -> $PRESET/skills/{${CAVEMAN_IDS
 - [ ] **Step 2: 可执行位 + 实际运行验证(用本机上游检出)**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && chmod +x scripts/sync-caveman-skills.sh && bash scripts/sync-caveman-skills.sh /mnt/e/project/caveman
+cd /home/goalizc/dsh-engineering && chmod +x scripts/sync-caveman-skills.sh && bash scripts/sync-caveman-skills.sh /mnt/e/project/caveman
 ```
 Expected: 依次输出 `syncing 3 caveman skills from /mnt/e/project/caveman`、`built .../preset/bootstrap.md ...`、末行 `caveman skills: 3 synced -> .../preset/skills/{caveman caveman-commit caveman-review}`; 退出码 0。
 
 - [ ] **Step 3: 验证 14+3 技能全在(整目录未被误删)**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && echo "SKILL.md count: $(find preset/skills -name SKILL.md | wc -l)" && ls -d preset/skills/brainstorming preset/skills/caveman preset/skills/caveman-commit preset/skills/caveman-review && node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('preset/.manifest.json','utf8'));const ids=['caveman','caveman-commit','caveman-review'];console.log('manifest has 3 caveman skills:',ids.every(i=>m.files['skills/'+i+'/SKILL.md']))"
+cd /home/goalizc/dsh-engineering && echo "SKILL.md count: $(find preset/skills -name SKILL.md | wc -l)" && ls -d preset/skills/brainstorming preset/skills/caveman preset/skills/caveman-commit preset/skills/caveman-review && node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('preset/.manifest.json','utf8'));const ids=['caveman','caveman-commit','caveman-review'];console.log('manifest has 3 caveman skills:',ids.every(i=>m.files['skills/'+i+'/SKILL.md']))"
 ```
 Expected: `SKILL.md count: 17`(14+3); 4 个 `ls` 目标目录都存在; `manifest has 3 caveman skills: true`。
 
 - [ ] **Step 4: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 printf '%s\n' 'feat: sync-caveman-skills.sh 白名单同步并联动重算清单' > .tmp-msg.txt
 git add scripts/sync-caveman-skills.sh && git commit -F .tmp-msg.txt && rm -f .tmp-msg.txt
 ```
@@ -205,13 +205,13 @@ git add scripts/sync-caveman-skills.sh && git commit -F .tmp-msg.txt && rm -f .t
 
 - [ ] **Step 1: 运行测试套件**
 
-Run: `cd /home/goalizc/superpowers-dsh && npm test`
+Run: `cd /home/goalizc/dsh-engineering && npm test`
 Expected: `tests 11, pass 11, fail 0`(技能为纯数据, 不新增用例)。
 
 - [ ] **Step 2: 临时 DSH_HOME 下 plant-core 植入并断言 3 技能落地(copy 分支)**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 W=$(mktemp -d)
 node scripts/plant-core.mjs install preset "$W" --name superpowers --policy copy
 for i in caveman caveman-commit caveman-review; do
@@ -229,7 +229,7 @@ Expected: 3 行 `OK <skill>`, 1 行 `OK brainstorming(已保留)`, 1 行 `TOTAL 
 > **勘误(2026-09-14, 实施后回填):** 原命令对逐文件 `[ -L .../caveman/SKILL.md ]` 断言在实测中失败。plant-core 的 `link` 策略是对安装目标**顶层 `skills` 目录整体**创建符号链接(见 `plant-core.mjs` 的link分支),并非对每个技能文件逐文件 symlink;且用相对 `source`(`preset`)会生成不可解析的相对链接。正确的验收是: 用绝对 source(如 `"$(pwd)/preset"`),并断言顶层 `[ -L "$W/superpowers/skills" ]` 加上 `[ -f "$W/superpowers/skills/caveman/SKILL.md" ]` 可解析。plant-core 属既有稳定代码,此缺陷是验收脚本写法问题,非本计划回归。
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 W=$(mktemp -d)
 node scripts/plant-core.mjs install "$(pwd)/preset" "$W" --name superpowers --policy link
 [ -L "$W/superpowers/skills" ] && echo "LINK OK skills(top-level)" || { echo "skills not a symlink" >&2; exit 1; }
@@ -241,7 +241,7 @@ Expected: `LINK OK skills(top-level)` 与 `RESOLVES OK caveman`(link 策略下�
 - [ ] **Step 4: 工作区干净 + 提交历史核对**
 
 ```bash
-cd /home/goalizc/superpowers-dsh && git status --short && echo '---' && git log --oneline -6
+cd /home/goalizc/dsh-engineering && git status --short && echo '---' && git log --oneline -6
 ```
 Expected: `git status --short` 无输出(干净); `git log` 显示本计划 3 个新提交(Task1/2/3)在 `main` 顶部。
 

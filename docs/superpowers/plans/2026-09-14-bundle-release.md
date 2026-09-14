@@ -73,7 +73,7 @@ test('buildManifestMap maps rel to hash', async () => {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cd /home/goalizc/superpowers-dsh && node --test scripts/plant-core.test.mjs`
+Run: `cd /home/goalizc/dsh-engineering && node --test scripts/plant-core.test.mjs`
 Expected: FAIL(`Cannot find module .../plant-core.mjs`)。
 
 - [ ] **Step 3: 实现 plant-core.mjs(本任务只写哈希/遍历/清单,plant() 在 Task 2 加)**
@@ -118,7 +118,7 @@ Expected: PASS(3 tests)。
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 git add scripts/plant-core.mjs scripts/plant-core.test.mjs
 git commit -m "feat: plant-core 哈希与目录遍历工具"
 ```
@@ -351,7 +351,7 @@ Expected: PASS(Task 1 的 3 + 本任务 6 用例)。
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 git add scripts/plant-core.mjs scripts/plant-core.test.mjs
 git commit -m "feat: plant 植入引擎 — copy 三态保守升级 + link 即时语义 + 原子写"
 ```
@@ -392,7 +392,7 @@ console.log(`manifest: ${Object.keys(files).length} files -> ${out}`);
 
 - [ ] **Step 2: 运行验证(应含 bootstrap/agent/plugins/skills,不含 .manifest 自身与 node_modules)**
 
-Run: `cd /home/goalizc/superpowers-dsh && node scripts/build-manifest.mjs preset && node -e "const m=require('./preset/.manifest.json'); console.log(Object.keys(m.files).length, Object.keys(m.files).includes('agent.cordis.yml'), Object.keys(m.files).includes('.manifest.json'))"`
+Run: `cd /home/goalizc/dsh-engineering && node scripts/build-manifest.mjs preset && node -e "const m=require('./preset/.manifest.json'); console.log(Object.keys(m.files).length, Object.keys(m.files).includes('agent.cordis.yml'), Object.keys(m.files).includes('.manifest.json'))"`
 Expected: 输出形如 `manifest: N files -> .../preset/.manifest.json`,下列行输出 `false false`(指 agent.cordis true、.manifest false——见说明)。
 
 > 精确断言命令:`node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('preset/.manifest.json','utf8'));const k=Object.keys(m.files);console.log('agent=',k.includes('agent.cordis.yml'),'self=',k.includes('.manifest.json'),'node_modules=',k.some(x=>x.startsWith('node_modules')));if(k.includes('agent.cordis.yml')||k.some(x=>x.startsWith('node_modules')))process.exit(1)"` — 期望 `agent= true self= false node_modules= false`。
@@ -400,7 +400,7 @@ Expected: 输出形如 `manifest: N files -> .../preset/.manifest.json`,下列�
 - [ ] **Step 3: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 git add scripts/build-manifest.mjs
 git commit -m "feat: build-manifest 从 preset 生成逐文件 sha-256 清单"
 ```
@@ -448,7 +448,7 @@ test('doInstall plants bundled preset to destRoot/superpowers', async () => {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `cd /home/goalizc/superpowers-dsh && node --test scripts/index.test.mjs`
+Run: `cd /home/goalizc/dsh-engineering && node --test scripts/index.test.mjs`
 Expected: FAIL(`Cannot find module '../index.js'`)。
 
 - [ ] **Step 3: 实现三个文件**
@@ -517,7 +517,7 @@ Expected: PASS(2 tests)。
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 git add index.js cordis.patch.yml package.json scripts/index.test.mjs
 git commit -m "feat: bundle 骨架 — 安装器插件 index.js + cordis.patch.yml + 根 package.json"
 ```
@@ -543,13 +543,13 @@ node "$(dirname "$0")/build-manifest.mjs" "$PRESET" >/dev/null
 
 - [ ] **Step 2: 运行验证**
 
-Run: `cd /home/goalizc/superpowers-dsh && rm -f preset/.manifest.json && src=scripts/build-bootstrap.sh && bash "$src"`
+Run: `cd /home/goalizc/dsh-engineering && rm -f preset/.manifest.json && src=scripts/build-bootstrap.sh && bash "$src"`
 Expected: 末行依次输出 `built .../preset/bootstrap.md (... bytes, ... lines)`;随后无报错,`preset/.manifest.json` 即被重新生成(`ls preset/.manifest.json`)。
 
 - [ ] **Step 3: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 git add scripts/build-bootstrap.sh
 git commit -m "feat: build-bootstrap 尾部联动生成 preset/.manifest.json"
 ```
@@ -586,7 +586,7 @@ POLICY="link"
 - [ ] **Step 2: 运行验证(link 与 copy 两分支)**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 bash scripts/install.sh            # 默认 link
 test -L "$HOME/.dsh/.agent-presets/superpowers/agent.cordis.yml" && echo LINK-OK
 tmp=$(mktemp -d); DSH_HOME="$tmp" bash scripts/install.sh --copy
@@ -603,7 +603,7 @@ preset/.manifest.json
 - [ ] **Step 4: 提交**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 git add scripts/install.sh .gitignore
 git commit -m "refactor: install.sh 委托 plant-core; gitignore 预设清单产物"
 ```
@@ -621,7 +621,7 @@ git commit -m "refactor: install.sh 委托 plant-core; gitignore 预设清单产
 
 - [ ] **Step 1: 运行测试套件**
 
-Run: `cd /home/goalizc/superpowers-dsh && npm test`
+Run: `cd /home/goalizc/dsh-engineering && npm test`
 Expected: PASS(plant-core 9 例 + index 2 例)。
 
 - [ ] **Step 2: 运行 manifest 构建脚本**
@@ -646,7 +646,7 @@ Expected: `manifest: N files -> ...` + `files N`(N>5)。
 - [ ] **Step 1: 打包并检查内容**
 
 ```bash
-cd /home/goalizc/superpowers-dsh
+cd /home/goalizc/dsh-engineering
 npm run build:manifest
 pnpm pack --pack-destination /tmp/sp-bundle   # 无 pnpm 时: npx pnpm pack ---pack-destination /tmp/sp-bundle
 tar -tzf /tmp/sp-bundle/superpowers-dsh-*.tgz | grep -E "preset/(agent.cordis.yml|.manifest.json|plugins/)" 

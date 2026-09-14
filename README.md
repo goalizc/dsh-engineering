@@ -1,4 +1,4 @@
-# engineering-dsh
+# dsh-engineering
 
 把**两套**上游技能方法论适配为 **DeepSeek Harness 的一个模式**：`工程模式`（preset id `engineering`）。
 
@@ -40,7 +40,7 @@
 ## 目录结构
 
 ```
-engineering-dsh/
+dsh-engineering/
 ├── index.js                         # bundle 安装器插件（dsh bundle 形态的入口）
 ├── cordis.patch.yml                 # bundle 挂载声明
 ├── package.json                     # 也定义 npm test（脚本与插件测试的 glob）
