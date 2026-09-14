@@ -1,7 +1,7 @@
 {
-  "name": "@superpowers-dsh/superpowers-dsh",
+  "name": "@engineering-dsh/engineering-dsh",
   "version": "0.1.0",
-  "description": "Superpowers skills as a DeepSeek Harness agent preset bundle.",
+  "description": "Superpowers and Caveman skills as a DeepSeek Harness agent preset bundle.",
   "type": "module",
   "main": "index.js",
   "files": ["index.js", "cordis.patch.yml", "preset", "scripts/plant-core.mjs", "preset/.manifest.json"],
@@ -10,6 +10,7 @@
   "publishConfig": { "access": "public" },
   "scripts": {
     "build:manifest": "node scripts/build-manifest.mjs preset --out preset/.manifest.json",
-    "test": "node --test scripts/*.test.mjs"
+    "pretest": "npm run build:manifest",
+    "test": "node --test scripts/*.test.mjs preset/plugins/*/*.test.mjs"
   }
 }

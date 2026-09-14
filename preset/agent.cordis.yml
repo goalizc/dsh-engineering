@@ -1,4 +1,4 @@
-# The `superpowers` agent preset: the standard coding agent, plus the
+# The `engineering` agent preset: the standard coding agent, plus the
 # Superpowers skills methodology (brainstorming → plans → subagent-driven
 # implementation → TDD → review → verification).
 #
@@ -7,7 +7,7 @@
 # 1. The Superpowers skills, vendored under this preset's own `skills/` and
 #    registered through `skill-filesystem` below — so they travel with the
 #    preset and need no user-global skill root.
-# 2. `plugins/superpowers-bootstrap`, a preset-local Cordis plugin that injects
+# 2. `plugins/bootstrap`, a preset-local Cordis plugin that injects
 #    the Superpowers bootstrap as durable user-role context at the start of
 #    every session. This is the harness port's Shape B: the injection is what
 #    makes the skills trigger at all — without it the skill files are inert.
@@ -262,7 +262,7 @@
     fetch: true
     searchTimeoutMs: 60000
 
-# ── superpowers bootstrap ───────────────────────────────────────────────────
+# ── bootstrap ───────────────────────────────────────────────────────────────
 
 # The harness port's Shape B: an in-process plugin that injects the Superpowers
 # bootstrap as durable user-role context at the first pre-step of every session,
@@ -277,8 +277,8 @@
 # from the harness — the message id it needs comes from `node:crypto` — so the
 # preset is fully self-contained and needs no `node_modules` link into the
 # harness's dependency tree.
-- id: superpowers-bootstrap
-  name: './plugins/superpowers-bootstrap/index.js'
+- id: bootstrap
+  name: './plugins/bootstrap/index.js'
 
 # ── skills ──────────────────────────────────────────────────────────────────
 

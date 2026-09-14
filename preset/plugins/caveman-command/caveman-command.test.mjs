@@ -1,5 +1,8 @@
-// preset/plugins/caveman-command/selftest.mjs
+// preset/plugins/caveman-command/caveman-command.test.mjs
 // Drives the installed apply() with a fake ctx — no harness, no agent needed.
+// Named `caveman-command.test.mjs` so `npm test` collects it (the glob covers
+// every plugin directory's `*.test.mjs`); it also runs standalone:
+// node preset/plugins/caveman-command/caveman-command.test.mjs
 import assert from 'node:assert/strict'
 import { apply, inject, name, CAVEMAN_LEVELS, parseLevel } from './index.js'
 

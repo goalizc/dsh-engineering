@@ -1,4 +1,4 @@
 # cordis.patch.yml
 - insert:
-    - id: superpowers-installer
-      name: '@superpowers-dsh/superpowers-dsh'
+    - id: engineering-installer
+      name: '@engineering-dsh/engineering-dsh'

@@ -43,7 +43,10 @@ async function copyAtomic(src, dst) {
   await rename(t, dst);
 }
 
-export async function plant({ source, destRoot, name = 'superpowers', policy = 'copy' }) {
+/** The preset id this bundle installs under. Single source of truth. */
+export const PRESET_ID = 'engineering';
+
+export async function plant({ source, destRoot, name = PRESET_ID, policy = 'copy' }) {
   const destDir = join(destRoot, name);
   const installedPath = join(destDir, '.installed.json');
   let installed = null;
@@ -102,17 +105,17 @@ export async function plant({ source, destRoot, name = 'superpowers', policy = '
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [, , cmd, source, destRoot, ...rest] = process.argv;
   if (cmd !== 'install' || !source || !destRoot) {
-    console.error('usage: node scripts/plant-core.mjs install <source> <destRoot> [--name superpowers] [--policy copy|link]');
+    console.error(`usage: node scripts/plant-core.mjs install <source> <destRoot> [--name ${PRESET_ID}] [--policy copy|link]`);
     process.exit(2);
   }
   const arg = (k) => rest[rest.indexOf(k) + 1];
-  const name = arg('--name') ?? 'superpowers';
+  const name = arg('--name') ?? PRESET_ID;
   const policy = arg('--policy') ?? 'copy';
   const r = await plant({ source, destRoot, name, policy }).catch((e) => {
-    console.error('superpowers: ' + e.message);
+    console.error('engineering: ' + e.message);
     process.exit(1);
   });
-  let line = `superpowers: ${r.action}`;
+  let line = `engineering: ${r.action}`;
   if (r.changed) line += ` (${r.changed} changed)`;
   if (r.kept) line += ` (${r.kept} kept user files)`;
   console.log(line);

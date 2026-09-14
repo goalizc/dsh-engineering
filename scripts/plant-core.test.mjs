@@ -4,7 +4,11 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { hashFile, walkFiles, buildManifestMap, plant } from './plant-core.mjs';
+import { hashFile, walkFiles, buildManifestMap, plant, PRESET_ID } from './plant-core.mjs';
+
+test('PRESET_ID is the documented preset id', () => {
+  assert.equal(PRESET_ID, 'engineering');
+});
 
 async function fixture() {
   const d = await mkdtemp(join(tmpdir(), 'plant-core-'));
@@ -49,8 +53,8 @@ test('plant first install -> planted, files landed', async () => {
   const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
   const r = await plant({ source: src, destRoot, policy: 'copy' });
   assert.equal(r.action, 'planted');
-  assert.equal(await readFile(join(destRoot, 'superpowers', 'bootstrap.md'), 'utf8'), 'hello');
-  const inst = JSON.parse(await readFile(join(destRoot, 'superpowers', '.installed.json'), 'utf8'));
+  assert.equal(await readFile(join(destRoot, PRESET_ID, 'bootstrap.md'), 'utf8'), 'hello');
+  const inst = JSON.parse(await readFile(join(destRoot, PRESET_ID, '.installed.json'), 'utf8'));
   assert.equal(inst.files['bootstrap.md'], await hashFile(join(src, 'bootstrap.md')));
 });
 
@@ -66,7 +70,7 @@ test('plant keeps user-modified file (partial) and lands new file', async () => 
   const src = await sourceWithManifest();
   const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
   await plant({ source: src, destRoot, policy: 'copy' });
-  const userFile = join(destRoot, 'superpowers', 'bootstrap.md');
+  const userFile = join(destRoot, PRESET_ID, 'bootstrap.md');
   await writeFile(userFile, 'user edit');
   await writeFile(join(src, 'skills', 'NEW.md'), 'new body');
   const rebuilt = {};
@@ -75,7 +79,7 @@ test('plant keeps user-modified file (partial) and lands new file', async () => 
   const r = await plant({ source: src, destRoot, policy: 'copy' });
   assert.equal(r.action, 'partial');
   assert.equal(await readFile(userFile, 'utf8'), 'user edit');
-  assert.equal(await readFile(join(destRoot, 'superpowers', 'skills', 'NEW.md'), 'utf8'), 'new body');
+  assert.equal(await readFile(join(destRoot, PRESET_ID, 'skills', 'NEW.md'), 'utf8'), 'new body');
   assert.equal(r.kept, 1);
 });
 
@@ -89,14 +93,14 @@ test('plant bundle update overwrites untouched file (updated)', async () => {
   await writeFile(join(src, '.manifest.json'), JSON.stringify({ version: 1, files: rebuilt }));
   const r = await plant({ source: src, destRoot, policy: 'copy' });
   assert.equal(r.action, 'updated');
-  assert.equal(await readFile(join(destRoot, 'superpowers', 'bootstrap.md'), 'utf8'), 'bundle v2');
+  assert.equal(await readFile(join(destRoot, PRESET_ID, 'bootstrap.md'), 'utf8'), 'bundle v2');
 });
 
 test('plant refuses non-empty dest without our marker (skipped)', async () => {
   const src = await sourceWithManifest();
   const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
-  await mkdir(join(destRoot, 'superpowers'), { recursive: true });
-  await writeFile(join(destRoot, 'superpowers', 'user.txt'), 'x');
+  await mkdir(join(destRoot, PRESET_ID), { recursive: true });
+  await writeFile(join(destRoot, PRESET_ID, 'user.txt'), 'x');
   await assert.rejects(plant({ source: src, destRoot, policy: 'copy' }));
 });
 
@@ -105,7 +109,7 @@ test('plant link policy creates real dir + per-entry symlinks, no manifest link'
   const destRoot = await mkdtemp(join(tmpdir(), 'plant-link-'));
   const r = await plant({ source: src, destRoot, policy: 'link' });
   assert.equal(r.action, 'planted');
-  const dest = join(destRoot, 'superpowers');
+  const dest = join(destRoot, PRESET_ID);
   const { lstat, readlink } = await import('node:fs/promises');
   const st = await lstat(join(dest, 'bootstrap.md'));
   assert.ok(st.isSymbolicLink());

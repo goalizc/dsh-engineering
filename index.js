@@ -5,23 +5,23 @@ import { plant } from './scripts/plant-core.mjs';
 
 export const PRESET_DIR = fileURLToPath(new URL('./preset', import.meta.url));
 
-export async function doInstall({ destRoot, name = 'superpowers' } = {}) {
+export async function doInstall({ destRoot, name = 'engineering' } = {}) {
   const dshHome = process.env.DSH_HOME || join(homedir(), '.dsh');
   const root = destRoot || join(dshHome, '.agent-presets');
   return plant({ source: PRESET_DIR, destRoot: root, name, policy: 'copy' });
 }
 
 export default {
-  name: 'superpowers-installer',
+  name: 'engineering-installer',
   async apply() {
     try {
       const r = await doInstall();
-      let line = `superpowers: preset ${r.action}`;
+      let line = `engineering: preset ${r.action}`;
       if (r.changed) line += ` (${r.changed} changed)`;
       if (r.kept) line += ` (${r.kept} kept user files)`;
       console.log(line);
     } catch (e) {
-      console.warn('superpowers: ' + e.message);
+      console.warn('engineering: ' + e.message);
     }
   },
 };

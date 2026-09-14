@@ -1,6 +1,6 @@
-# superpowers-dsh
+# engineering-dsh
 
-把 [Superpowers](https://github.com/obra/superpowers)（v6.1.1）适配为 **DeepSeek Harness 的一个新模式**：`Superpowers 模式`。
+把 [Superpowers](https://github.com/obra/superpowers)（v6.1.1）适配为 **DeepSeek Harness 的一个新模式**：`工程模式`。
 
 这不是给 DSH 打补丁，而是按 Superpowers 官方的宿主移植契约（`docs/porting-to-a-new-harness.md`）做一个 **Shape B** 移植：一个进程内插件把 bootstrap 在会话开始时注入模型上下文；DSH 的 preset（模式）机制天然满足"自动注入、无需逐会话 opt-in"这条唯一不可协商的要求。
 
@@ -9,21 +9,21 @@
 ## 目录结构
 
 ```
-superpowers-dsh/
+engineering-dsh/
 ├── preset/                          # 这个目录就是被 DSH 挂载的"模式"
 │   ├── preset.yml                   # 显示名与描述（模式选择器读它）
 │   ├── agent.cordis.yml             # 组合：persona + 标准工具面 + bootstrap 插件 + 技能目录
 │   ├── bootstrap.md                 # 生成物：using-superpowers 正文 + 工具映射 + 仓库规则优先
 │   ├── SYNC.md                      # 生成物：上游 commit / 版本 / 同步时间
-│   ├── plugins/superpowers-bootstrap/
+│   ├── plugins/bootstrap/
 │   │   ├── index.js                 # 注入插件（agent/pre-step，幂等，压缩后自愈）
 │   │   ├── package.json
-│   │   └── selftest.mjs             # 无宿主依赖的回归测试
+│   │   └── bootstrap.test.mjs       # 无宿主依赖的回归测试
 │   └── skills/                      # vendored：上游 14 个技能原样 + 一份 dsh-tools.md
 └── scripts/
     ├── sync-superpowers-skills.sh   # 从上游检出同步 skills/ 并重打 DSH 指针
     ├── build-bootstrap.sh           # 重建 bootstrap.md（带自检）
-    └── install.sh                   # 投影到 ${DSH_HOME}/.agent-presets/superpowers
+    └── install.sh                   # 投影到 ${DSH_HOME}/.agent-presets/engineering
 ```
 
 ## 安装 / 刷新
@@ -36,11 +36,11 @@ scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器
 
 `install.sh` 在末尾自动运行插件自测，失败即中止安装。**换机后无需任何手工依赖处理，重新 clone 后直接跑 `install.sh` 即可。**
 
-之后**新建**一个会话，在模式选择器里选 `Superpowers 模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建。
+之后**新建**一个会话，在模式选择器里选 `工程模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建。
 
 ### 为什么安装成"真实目录 + 符号链接"
 
-preset 发现用 `readdir(root, { withFileTypes: true })` 并只接受 `isDirectory()` 为真的条目。**指向目录的符号链接会被静默跳过**（`isDirectory()` 返回 false），所以不能把 `~/.dsh/.agent-presets/superpowers` 直接做成指向本检出的符号链接。`install.sh` 因此创建一个真实目录，内部每个条目是符号链接——既被发现，又保持改动即时生效。
+preset 发现用 `readdir(root, { withFileTypes: true })` 并只接受 `isDirectory()` 为真的条目。**指向目录的符号链接会被静默跳过**（`isDirectory()` 返回 false），所以不能把 `~/.dsh/.agent-presets/engineering` 直接做成指向本检出的符号链接。`install.sh` 因此创建一个真实目录，内部每个条目是符号链接——既被发现，又保持改动即时生效。
 
 这个 preset 是**自包含、跨机器可移植**的：它的 bootstrap 插件不 import harness 任何包（构造注入消息用 `node:crypto` 的 `randomUUID` 复刻 `createUserMessage` 的形状），因此不需要指向 harness 依赖树的 `node_modules` 链接——装到任何装有 DSH 的机器都能直接跑。
 
@@ -51,8 +51,8 @@ preset 发现用 `readdir(root, { withFileTypes: true })` 并只接受 `isDirect
 **1. 插件自测（不需要 running agent，秒级）**
 
 ```sh
-cd preset/plugins/superpowers-bootstrap && node selftest.mjs
-# => selftest OK: 6 assertions groups passed / bootstrap bytes: 9061
+cd preset/plugins/bootstrap && node bootstrap.test.mjs
+# => selftest OK: 6 assertions groups passed / bootstrap bytes: 9734
 ```
 
 （`install.sh` 末尾已自动运行此自测，无需单独执行。）
@@ -63,12 +63,12 @@ cd preset/plugins/superpowers-bootstrap && node selftest.mjs
 
 用本仓库外的 `sp_probe` / `sp_verify` 探针工具：
 
-- `sp_probe validate=superpowers` → `MOUNT OK: superpowers`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）
-- `sp_verify preset=superpowers cwd=<workspace>` → 断言该 preset 作用域下的技能目录
+- `sp_probe validate=engineering` → `MOUNT OK: engineering`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）
+- `sp_verify preset=engineering cwd=<workspace>` → 断言该 preset 作用域下的技能目录
 
 **3. 端到端（需要人类，唯一的最终证据）**
 
-新建会话选 `Superpowers 模式`，发：
+新建会话选 `工程模式`，发：
 
 > Let's make a react todo list
 

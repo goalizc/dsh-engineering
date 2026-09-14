@@ -1,0 +1,11 @@
+{
+  "name": "dsh-bootstrap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Injects the Superpowers bootstrap and the Caveman default style as durable user-role context for agents on this preset.",
+  "main": "index.js",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  }
+}

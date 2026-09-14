@@ -5,14 +5,16 @@
  * plugin imports nothing from the harness — the `createUserMessage` helper it
  * uses is self-contained — so this test needs no `node_modules` link and passes
  * with no harness packages on the resolution path. No test framework: it
- * asserts and exits non-zero.
+ * asserts and exits non-zero. Named `bootstrap.test.mjs` so `npm test` collects
+ * it (the glob covers every plugin directory's `*.test.mjs`); it also runs
+ * standalone.
  *
  * The test does not run a real agent. It drives the plugin's `agent/pre-step`
  * listener with synthetic decisions and asserts the three porting-contract
  * properties: a durable user-role message is added once, is not duplicated, and
  * is added again after a compaction that drops it.
  *
- * Usage: node --experimental-... (none needed) plugins/superpowers-bootstrap/selftest.mjs
+ * Usage: node preset/plugins/bootstrap/bootstrap.test.mjs   (or: npm test)
  */
 
 import { strict as assert } from 'node:assert'
@@ -31,7 +33,7 @@ const fakeCtx = {
 
 apply(fakeCtx)
 
-assert.equal(name, 'superpowers-bootstrap', 'plugin name')
+assert.equal(name, 'bootstrap', 'plugin name')
 assert.equal(listeners.length, 1, 'installs exactly one listener')
 assert.equal(listeners[0].event, 'agent/pre-step', 'listens on agent/pre-step')
 

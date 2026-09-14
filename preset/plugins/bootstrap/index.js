@@ -26,7 +26,7 @@
  * once per mount and cached; editing it requires restarting the session, the
  * same as editing the composition.
  *
- * @module dsh-superpowers-bootstrap
+ * @module dsh-bootstrap
  */
 
 import { readFileSync } from 'node:fs'
@@ -45,7 +45,7 @@ import { fileURLToPath } from 'node:url'
  */
 
 /** Cordis plugin name. */
-const name = 'superpowers-bootstrap'
+const name = 'bootstrap'
 
 /**
  * Deep-freeze a message the way the harness publishes its own messages.
@@ -96,7 +96,7 @@ const BOOTSTRAP_SOURCE = Object.freeze({ kind: 'plugin', plugin: name })
 /**
  * Absolute path of the shipped bootstrap text.
  *
- * This module sits at `<preset>/plugins/superpowers-bootstrap/index.js` and the
+ * This module sits at `<preset>/plugins/bootstrap/index.js` and the
  * text at `<preset>/bootstrap.md`, so the specifier climbs two levels.
  */
 const DEFAULT_BOOTSTRAP_URL = new URL('../../bootstrap.md', import.meta.url)
@@ -108,7 +108,7 @@ let cachedBootstrap
  * The bootstrap text, read from disk on first use.
  *
  * A read failure is not fatal to the session: the plugin reports it once and
- * contributes nothing, so a missing file degrades to "no superpowers" rather
+ * contributes nothing, so a missing file degrades to "no bootstrap" rather
  * than to a session that cannot start.
  *
  * @returns the assembled bootstrap text, or undefined when unreadable.
@@ -120,7 +120,7 @@ function loadBootstrap(ctx) {
   } catch (error) {
     cachedBootstrap = undefined
     ctx.logger?.warn?.(
-      `superpowers-bootstrap: cannot read ${fileURLToPath(DEFAULT_BOOTSTRAP_URL)}: ${String(error)}`,
+      `bootstrap: cannot read ${fileURLToPath(DEFAULT_BOOTSTRAP_URL)}: ${String(error)}`,
     )
   }
   return cachedBootstrap

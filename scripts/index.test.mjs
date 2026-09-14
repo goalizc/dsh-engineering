@@ -11,10 +11,10 @@ test('default export is a cordis plugin', () => {
   assert.equal(typeof plugin.apply, 'function');
 });
 
-test('doInstall plants bundled preset to destRoot/superpowers', async () => {
+test('doInstall plants bundled preset to destRoot/engineering', async () => {
   const destRoot = await mkdtemp(join(tmpdir(), 'bundle-dest-'));
   const r = await doInstall({ destRoot });
   assert.equal(r.action, 'planted');
-  const comp = await readFile(join(destRoot, 'superpowers', 'agent.cordis.yml'), 'utf8');
-  assert.ok(comp.includes('superpowers-bootstrap'));
+  const comp = await readFile(join(destRoot, 'engineering', 'agent.cordis.yml'), 'utf8');
+  assert.ok(comp.includes('plugins/bootstrap'));
 });
