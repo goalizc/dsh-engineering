@@ -84,7 +84,7 @@ scripts/install.sh                  # 默认：真实目录 + 逐项符号链接
 scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器）
 ```
 
-`install.sh` 末尾自动运行**每个**预设本地插件的自测（`bootstrap` 与 `caveman-command`），任一失败即中止安装并明确报错，避免把坏 preset 静默装到新机器上。
+`install.sh` 末尾遍历 `preset/plugins/*/` 运行**每个**预设本地插件的自测（当前是 `bootstrap` 与 `caveman-command`），任一失败即中止安装并明确报错；某个插件缺少同名 `<name>.test.mjs` 同样直接失败——插件名单不写死，新增插件自动纳入门禁，"新增插件必须带自测"因此是门禁的一部分，避免把坏 preset 静默装到新机器上。
 
 之后**新建**一个会话，在模式选择器里选 `工程模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建——安装完成后继续用旧会话是看不到的。
 

@@ -45,15 +45,29 @@ echo "verify:      sp_probe validate=engineering   (from a session with the prob
 echo "next:        start a new session and pick it in the agent-preset picker"
 
 # Cheap porting-contract checks; fail loudly instead of silently shipping a
-# broken preset to a new machine. Every preset-local plugin is covered: a plugin
-# that fails to register degrades silently at runtime, so the install gate is the
-# only place that can catch it before a human relies on it.
+# broken preset to a new machine. The gate covers EVERY preset-local plugin by
+# iterating the directory — never a hand-written list, which is how a newly
+# added plugin gets skipped in silence (the silent-degradation class this gate
+# exists to stop). A plugin without its `<name>.test.mjs` therefore fails the
+# install: shipping a self-test is part of adding a plugin.
 echo
-for plugin in bootstrap caveman-command; do
-  if (cd "$SRC/plugins/$plugin" && node "$plugin.test.mjs"); then
+[ -d "$SRC/plugins" ] || { echo "missing preset plugins directory: $SRC/plugins" >&2; exit 1; }
+plugins_checked=0
+for dir in "$SRC"/plugins/*/; do
+  [ -d "$dir" ] || continue
+  plugin="$(basename "$dir")"
+  test_file="$dir$plugin.test.mjs"
+  if [ ! -f "$test_file" ]; then
+    echo "self-test missing: $test_file — every preset-local plugin must ship one" >&2
+    exit 1
+  fi
+  if (cd "$dir" && node "$plugin.test.mjs"); then
     echo "self-test: $plugin OK"
   else
     echo "self-test: $plugin FAILED — see output above" >&2
     exit 1
   fi
+  plugins_checked=$((plugins_checked + 1))
 done
+[ "$plugins_checked" -gt 0 ] || { echo "no preset-local plugins found under $SRC/plugins" >&2; exit 1; }
+echo "self-tests: $plugins_checked plugin(s) OK"
