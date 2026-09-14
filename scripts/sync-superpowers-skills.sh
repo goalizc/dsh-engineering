@@ -27,6 +27,15 @@ if ! grep -q 'references/dsh-tools.md' "$SKILL"; then
   printf '%s\n' '- DeepSeek Harness: `references/dsh-tools.md`' >> "$SKILL"
 fi
 
+# The full-directory replace above deletes repo-local files under skills/;
+# upstream never carries this harness's tool mapping, so restore it from the
+# repo (tracked) when the copy did not bring it back.
+TOOLS_REL="preset/skills/using-superpowers/references/dsh-tools.md"
+if [ ! -f "$ROOT/$TOOLS_REL" ] && git -C "$ROOT" rev-parse --verify --quiet "HEAD:$TOOLS_REL" >/dev/null; then
+  git -C "$ROOT" restore -- "$TOOLS_REL"
+  echo "restored $ROOT/$TOOLS_REL (repo-local tool mapping)"
+fi
+
 {
   echo "# 上游同步记录"
   echo
