@@ -62,3 +62,6 @@ done
 [ "$fail" -eq 0 ] || exit 1
 
 printf 'built %s (%s bytes, %s lines)\n' "$OUT" "$(wc -c < "$OUT")" "$(wc -l < "$OUT")"
+
+# 让发布包的逐文件内容戳与本次构建保持同步。
+node "$(dirname "$0")/build-manifest.mjs" "$PRESET" >/dev/null
