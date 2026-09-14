@@ -84,7 +84,7 @@ scripts/install.sh                  # 默认：真实目录 + 逐项符号链接
 scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器）
 ```
 
-`install.sh` 末尾自动运行 bootstrap 插件自测，失败即中止安装并明确报错，避免把坏 preset 静默装到新机器上。
+`install.sh` 末尾自动运行**每个**预设本地插件的自测（`bootstrap` 与 `caveman-command`），任一失败即中止安装并明确报错，避免把坏 preset 静默装到新机器上。
 
 之后**新建**一个会话，在模式选择器里选 `工程模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建——安装完成后继续用旧会话是看不到的。
 
@@ -103,7 +103,7 @@ scripts/sync-superpowers-skills.sh   # -> .cache/superpowers，锁定 commit
 scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 ```
 
-`CACHE_ROOT` 可覆盖缓存位置。**锁定 commit，不追最新分支**——同步必须可复现，写进 `preset/SYNC.md` 的是确切 commit 与同步时间，不是"某天的 master"。
+`CACHE_ROOT` 可覆盖缓存位置。**锁定 commit，不追最新分支**——同步必须可复现；`preset/SYNC.md` 记录确切 commit 与同步时间。
 
 两个上游的 vendee 范围不同，因此两个脚本会互相补齐：
 
@@ -114,7 +114,7 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 
 ## 验证
 
-三层，从便宜到昂贵。前两层在本仓库可直接跑；第三层不是自动化的。
+三层，从便宜到昂贵。第 1 层在本仓库可直接跑；第 2 层需要本会话之外的探针工具；第 3 层不是自动化的。
 
 **1. 测试（不需要 running agent，秒级）**
 
