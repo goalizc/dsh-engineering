@@ -167,6 +167,21 @@ repository rules that override generic skill advice:
 
 ---
 
+## Caveman output style
+
+Default compression level: **full**. Terse like smart caveman — all technical
+substance stays, only fluff dies.
+
+Superpowers workflow artifacts — plans, specs, designs, review comments, TDD
+red/green explanations, pre-edit clarifications — stay complete, structured,
+and take priority over compression.
+
+The `caveman` skill holds the level definitions. It is NOT active yet: load it
+with the `skill` tool when the user changes the level, or when you need the full
+rule set. Levels: lite, full, ultra, wenyan-lite, wenyan-full, wenyan-ultra, off.
+The `/caveman` command sets the level; without it, obey an explicit level request
+in plain language.
+
 ## Repository rules take precedence
 
 The workspace's own instruction files (`AGENTS.md`, `CLAUDE.md`, local overlays)

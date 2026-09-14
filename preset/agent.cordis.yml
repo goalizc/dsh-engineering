@@ -36,7 +36,12 @@
 
       Skills are mandatory workflows, not suggestions. Process skills come first (brainstorming, systematic-debugging), then implementation skills. Announce "Using [skill] to [purpose]" and follow the skill exactly.
 
-      For routine engineering chat and implementation notes, answer concisely (caveman lite): drop pleasantries, keep every technical entity, code, command, and exact error verbatim. Superpowers workflow artifacts — plans, specs, designs, review comments, TDD red/green explanations, pre-edit clarifications — stay complete, structured, and take priority over compression. Tune with `/caveman full|ultra|off`; `/caveman-commit` and `/caveman-review` apply terse output within their own scopes.
+      Output style: caveman, level full (see the injected "Caveman output style"
+      section). Keep every technical entity, code, command, and exact error verbatim.
+      Superpowers workflow artifacts — plans, specs, designs, review comments, TDD
+      red/green explanations, pre-edit clarifications — stay complete, structured,
+      and take priority over compression. The `/caveman` command changes the level;
+      the `caveman` skill holds the level rules and is loaded on demand.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
