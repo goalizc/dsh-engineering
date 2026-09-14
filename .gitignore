@@ -7,3 +7,6 @@ preset/node_modules/
 
 # 构建产物：预设文件的逐文件 sha-256 清单（发布打包时经 files 白名单打入）
 preset/.manifest.json
+
+# SDD 进度账本等工作区草稿（不入库）
+.superpowers/
