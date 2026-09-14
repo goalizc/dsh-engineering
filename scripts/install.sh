@@ -44,12 +44,16 @@ echo "composition: $DEST/agent.cordis.yml"
 echo "verify:      sp_probe validate=engineering   (from a session with the probe mounted)"
 echo "next:        start a new session and pick it in the agent-preset picker"
 
-# Cheap porting-contract check; fail loudly instead of silently shipping a
-# broken preset to a new machine.
+# Cheap porting-contract checks; fail loudly instead of silently shipping a
+# broken preset to a new machine. Every preset-local plugin is covered: a plugin
+# that fails to register degrades silently at runtime, so the install gate is the
+# only place that can catch it before a human relies on it.
 echo
-if (cd "$SRC/plugins/bootstrap" && node bootstrap.test.mjs); then
-  echo "self-test: OK"
-else
-  echo "self-test: FAILED — the preset will not bootstrap; see output above" >&2
-  exit 1
-fi
+for plugin in bootstrap caveman-command; do
+  if (cd "$SRC/plugins/$plugin" && node "$plugin.test.mjs"); then
+    echo "self-test: $plugin OK"
+  else
+    echo "self-test: $plugin FAILED — see output above" >&2
+    exit 1
+  fi
+done
