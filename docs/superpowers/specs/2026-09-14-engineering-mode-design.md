@@ -252,11 +252,53 @@ cat .cache/caveman/.git/HEAD 2>/dev/null || true
 git check-ignore -v .cache                           # 期望命中 .gitignore
 
 # 回归
-npm test                                             # 期望 11 passed
-node preset/plugins/bootstrap/selftest.mjs           # 期望 selftest OK
+npm test                                             # 期望 15 passed
+node preset/plugins/bootstrap/bootstrap.test.mjs     # 期望 selftest OK
 ```
 
 **人工验收（唯一能证明激活生效的步骤）**：新建会话选 `工程模式`，观察 (a) 回复默认即为 full 级压缩；(b) 输入 `/caveman off` 后风格恢复；(c) 输入 `/caveman ultra` 后风格加强。
+
+## 8bis. 执行后勘误（本节为实施回填，非原始设计）
+
+实施与评审过程中，本节原先的若干断言被实测证伪。如实记录，使本文档可复现。
+
+**E1 — §8 验证清单的四处不准**
+
+| 原文 | 实测 | 处置 |
+|---|---|---|
+| `npm test` 期望 `11 passed` | 改名并收编插件自测后为 **15 pass / 0 fail** | 已就地更正为 15 |
+| `node preset/plugins/bootstrap/selftest.mjs` | 该文件已按 §5.1 的重命名计划改为 `bootstrap.test.mjs` | 已就地更正 |
+| 上半段 `grep -rn "superpowers" --include=*` 期望"无产品名遗留" | **按构造不可达**：会计入被 gitignore 的 `.superpowers/sdd/**` 账本，并匹配大量合法上游名（`using-superpowers`、`superpowers:<skill>`、`You have superpowers.`）、上游产物路径 `docs/superpowers/` 与生成物 | 见 E2 |
+| 第 2 层"需要探针"隐含只有探针一条路 | **低估**：harness 自带的 `discoverPresets` 组合健康检查在本仓库可跑，且实测通过 | 见 E3 |
+
+**E2 — 替代 §8 的改名断言（实测干净）**
+
+```sh
+# 只搜已追踪文件：git grep 天然排除 gitignored 的账本与 manifest
+git grep -n "@superpowers-dsh\|superpowers-dsh\|Superpowers 模式\|superpowers-installer\|superpowers-bootstrap" -- . \
+  | grep -v "^docs/superpowers/" | grep -v "^preset/skills/" | grep -v "^preset/bootstrap.md" \
+  | grep -v "^preset/SYNC.md" | grep -v "^THIRD-PARTY-NOTICES.md" \
+  | grep -v "^docs/feasibility-report.md" | grep -v "^evidence/VERIFICATION.md"   # 期望 exit=1
+
+# 反向断言：上游署名必须存活 —— 改名若抹掉署名是缺陷，不是成功
+git grep -c "obra/superpowers" -- README.md THIRD-PARTY-NOTICES.md preset/SYNC.md   # 期望各非零
+```
+
+**E3 — 第 2 层拆成 2a 与 2b，其中 2a 在本仓库可自动化**
+
+- **2a（可跑，已实测）**：harness 自带的 roster 健康检查 `discoverPresets([{path:'<tmp>/.agent-presets', trust:'user'}], <已安装 dsh-agent-presets 的 baseUrl>)`。它解析组合的 YAML 方言、跑 `entryListProblem`、并解析**每一行**的 specifier。实测对本设计产出的 link 布局返回 `[{id:"engineering", name:"工程模式", order:5, broken:null}]`。
+- **2b（残余缺口）**：真正的 `standingKeyFor` 挂载（realm 合法性、`inject` 激活、`!!js` 求值）。无探针时不可跑；风险小（与既有 `command-goal` 行同形、不发布服务、首次会话启动即响亮失败）。
+- **第 3 层（端到端）**：`/caveman ultra` 是否真的改变风格。**零执行证据**。可行路径已探明：`headless` 是随发行提供的 profile 模板，配合可写的 `DSH_HOME` 与 `agent-presets.default: engineering`，一次模型调用即可。属人类验收。
+
+**E4 — 设计文档未预见的实现期约束（两条，均为实测所得）**
+
+1. **预设本地插件不得 `import` 任何 `@deepseek-ai/*` 包。** 实测：从检出目录解析 `@deepseek-ai/dsh-llm` 失败（`ERR_MODULE_NOT_FOUND`）；只有**已安装**的 preset 才有 `node_modules` 符号链接，而 `--copy` 安装模式根本没有该链接。故消息对象须用 `node:crypto` 自行构造。§7.1 的示例代码未说明这一点。
+2. **`invocation.agent.followup(message: UserMessage): void`** 是命令把内容送进对话的唯一通道（依据 `dsh-command-goal/lib/index.js:97-106`），且需要真正的 `UserMessage` 对象——这印证了上一条。
+
+**E5 — 上游获取决策的执行期教训（submodule 的否决理由已被实测加强）**
+
+§6.1 否决 submodule 的判断正确。执行期另有一条与本文档无关的教训需注意：若改用 subtree，浅克隆参考仓库不可用（`git subtree add` 会执行自己的 `git fetch`，git 拒绝更新浅克隆的根），且祖先提交的树必须与目标前缀对齐。该教训属 git 纳管任务线（`docs/superpowers/{specs,plans}/2026-09-12-*`），此处仅作交叉引用，避免误记入本文档。
+
 
 ## 9. 人类动作（不由本设计执行）
 

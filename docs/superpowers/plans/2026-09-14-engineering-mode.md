@@ -8,6 +8,24 @@
 
 **Tech Stack:** Node ≥18（`node:test` + `node:assert/strict`）、bash、Cordis 插件（`name`/`inject`/`apply`）、git。
 
+## 执行后勘误（本节为实施回填，非原始计划）
+
+本计划已执行完毕（6 任务，`70e5ec2..ee5b0a0` 之后另有收尾修复）。执行期与评审期共发现 **7 处计划缺陷**，其中多数是执行者被迫绕开的——正文保留原样以存真，此处逐条列明，供复用本计划时修正。
+
+| # | 位置（本文件行号） | 缺陷 | 执行期的正确做法 |
+|---|---|---|---|
+| 1 | `153` | `printf … >> "$SKILL"` 把 DSH 指针行**追加到文件末尾** | 改为幂等重排：插到 `## Platform Adaptation` 小节的 `- Antigravity:` 行之后，并删除错位行（Task 1 修复 `b470028`） |
+| 2 | `714`、`769` | `git add … preset/.manifest.json && git commit` —— 该路径**被 gitignore**，`git add` **退出 1**，`&&` 短路会**静默跳过提交** | 只显式暂存已追踪文件；绝不把被忽略路径放进 `&&` 链 |
+| 3 | `918` | `grep -rn "superpowers" --include=*` 期望"无输出"——**按构造不可达**（计入 gitignored 账本 + 大量合法上游名） | 改用 `git grep`（只搜已追踪文件）+ 产品名特征串，并加反向断言（上游署名须存活）。见 spec §8bis E2 |
+| 4 | `723` | Files 列了 `Modify: scripts/build-manifest.mjs`（原文已带"若需同步；先读确认"的保留）——实测该文件**遍历目录**，加插件目录**无需改动** | 不碰该文件 |
+| 5 | `35`、`330`、`340`、`343` | `selftest.mjs` 命名——后按重命名需求改为 `bootstrap.test.mjs` / `caveman-command.test.mjs` 并收进 `npm test`（Task 5） | 使用 `*.test.mjs`，由根测试 glob 收集 |
+| 6 | `764`、`890`、`1086` | 过期测试计数（`11` / `12`）——收编插件自测后为 **15** | 计数随每次收编而变，不要写死 |
+| 7 | `930` | `git add -A` —— 会把无关路径卷入，提交不可审 | 显式逐路径暂存 |
+
+**另有一处计划未预见的实现约束**（不属缺陷，但复用本计划必须知道）：**预设本地插件不得 `import` 任何 `@deepseek-ai/*` 包**。实测依据——从检出目录解析 `@deepseek-ai/dsh-llm` 失败（`ERR_MODULE_NOT_FOUND`），只有已安装的 preset 才有 `node_modules` 符号链接，而 `--copy` 安装模式根本没有该链接。故消息对象须用 `node:crypto` 自行构造。详见 spec §8bis E4。
+
+**注意**：本计划**未**采用 subtree；`subtree` 相关教训属 git 纳管任务线（`docs/superpowers/{specs,plans}/2026-09-12-*`）。
+
 ## Global Constraints
 
 - 产品名：preset ID = **`engineering`**，显示名 = **`工程模式`**，npm 包名 = **`@engineering-dsh/engineering-dsh`**，插件目录 = **`preset/plugins/bootstrap/`**。
