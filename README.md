@@ -92,7 +92,7 @@ scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器
 
 preset 发现用 `readdir(root, { withFileTypes: true })` 并只接受 `isDirectory()` 为真的条目。**指向目录的符号链接会被静默跳过**（`isDirectory()` 返回 false），所以不能把 `~/.dsh/.agent-presets/engineering` 直接做成指向本检出的符号链接。`install.sh` 因此创建一个真实目录，内部每个条目是符号链接——既被发现，又保持改动即时生效。
 
-预设本地插件**自包含**：不 import 任何 harness 包（构造注入消息用 `node:crypto` 复刻 `createUserMessage` 的形状）。原因是本地创作的 preset 位于用户家目录，Node 的 `node_modules` 上行查找到不了 harness 自己的包，而 `--copy` 安装模式连链接都没有。这也是 `bootstrap/index.js` 与 `caveman-command/index.js` 各持一份逐字相同的消息构造代码的原因——跨安装布局没有共享模块可用，改一处必须同 commit 改另一处。
+预设本地插件**自包含**：不 import 任何 harness 包（构造注入消息用 `node:crypto` 复刻 `createUserMessage` 的形状）。原因是本地创作的 preset 位于用户家目录，Node 的 `node_modules` 上行查找到不了 harness 自己的包，而 `--copy` 安装模式连链接都没有。这也是 `bootstrap/index.js` 与 `caveman-command/index.js` 各持一份**语义相同**的消息构造代码的原因——两份里 `deepFreeze` 逐字相同，`createUserMessage` 只是排版不同；不变量是**字段（`role`/`content`/`source`）、深冻结与全新 UUID**，不是字节。跨安装布局没有共享模块可用，改一处必须同 commit 改另一处。
 
 ## 上游同步
 
