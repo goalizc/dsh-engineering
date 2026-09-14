@@ -7,11 +7,29 @@
 write_sync_section() {
   local label="$1" upstream="$2" url="$3"
   local file="$PRESET/SYNC.md"
-  # preset/ ships in the published package (package.json "files"), so the cache
-  # path is written relative to $HOME: a contributor's absolute home directory
-  # must never be baked into a released artifact. Falls back to the raw path
-  # when the cache lives outside $HOME (only when CACHE_ROOT overrides it).
-  local shown_upstream="${upstream/#$HOME/\~}"
+  # preset/ ships in the published package (package.json "files"), so no
+  # machine-specific path may be baked into this generated file. The cache is
+  # shown relative to THIS repository's root when it lives inside it (the
+  # default: <repo>/.cache/<upstream>), which is portable and still tells a
+  # reader where to look. A CACHE_ROOT outside the repository cannot be
+  # expressed portably, so it falls back to the `$UPSTREAM` placeholder the
+  # file carried before the cache became script-managed.
+  #
+  # Relativizing against $HOME is deliberately NOT done: that is what leaked
+  # `~/superpowers-dsh/.cache/...` into a release artifact (the home directory
+  # happens to repeat the checkout's directory name, which is local fact).
+  local repo_root shown_upstream note
+  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  case "$upstream" in
+    "$repo_root"/*)
+      shown_upstream="${upstream#"$repo_root"/}"
+      note='（相对仓库根）'
+      ;;
+    *)
+      shown_upstream='$UPSTREAM'
+      note='（占位符：缓存位于本仓库之外，公开分发时不泄漏本机路径）'
+      ;;
+  esac
 
   if [ ! -f "$file" ]; then
     printf '# 上游同步记录\n' > "$file"
@@ -28,10 +46,13 @@ write_sync_section() {
   {
     printf '\n## %s\n\n' "$label"
     printf -- '- 上游仓库: %s\n' "$url"
-    printf -- '- 本地缓存: %s\n' "$shown_upstream"
+    printf -- '- 本地缓存: %s%s\n' "$shown_upstream" "$note"
     git -C "$upstream" log -1 --format='- commit: %H%n- date: %ad%n- subject: %s' --date=short
     if [ -f "$upstream/package.json" ]; then
-      grep -m1 '"version"' "$upstream/package.json" | sed 's/^ */- package.json version: /'
+      # Value only: the label already names the field, and keeping the raw JSON
+      # key printed `- package.json version: "version": "6.1.1",`.
+      sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/- package.json version: \1/p' \
+        "$upstream/package.json" | head -n 1
     fi
     printf -- '- 同步时间: %s\n' "$(date -Iseconds)"
   } >> "$file"
