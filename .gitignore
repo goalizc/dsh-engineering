@@ -4,3 +4,6 @@ preset/node_modules/
 
 # 探针与临时 checkout（上游快照、布局比对等）
 .tmp-*/
+
+# 构建产物：预设文件的逐文件 sha-256 清单（发布打包时经 files 白名单打入）
+preset/.manifest.json

@@ -27,31 +27,16 @@ DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
 DEST_ROOT="$DSH_HOME/.agent-presets"
 DEST="$DEST_ROOT/superpowers"
 MODE="${1:-}"
+POLICY="link"
+[ "$MODE" != "--copy" ] || POLICY="copy"
 
 [ -f "$SRC/agent.cordis.yml" ] || { echo "missing composition: $SRC/agent.cordis.yml" >&2; exit 1; }
 [ -f "$SRC/bootstrap.md" ] || { echo "missing bootstrap: run scripts/build-bootstrap.sh first" >&2; exit 1; }
 
 mkdir -p "$DEST_ROOT"
-rm -rf "$DEST"
-mkdir -p "$DEST"
 
-if [ "$MODE" = "--copy" ]; then
-  cp -R "$SRC/." "$DEST/"
-  echo "copied  $SRC -> $DEST"
-else
-  shopt -s dotglob nullglob
-  for entry in "$SRC"/*; do
-    ln -sfn "$entry" "$DEST/$(basename "$entry")"
-  done
-  echo "linked  $SRC/* -> $DEST"
-fi
-
-# The installed directory must be a real directory; a symlinked one is skipped
-# by discovery without any diagnostic.
-if [ -L "$DEST" ]; then
-  echo "error: $DEST is a symlink; discovery will skip it" >&2
-  exit 1
-fi
+# 委托共享植入引擎；link=即时生效符号链接, copy=深拷贝(换机可移除检出)。
+node "$(dirname "$0")/plant-core.mjs" install "$SRC" "$DEST_ROOT" --name superpowers --policy "$POLICY"
 
 echo
 echo "installed preset id: superpowers"
