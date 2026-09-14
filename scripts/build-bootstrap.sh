@@ -59,6 +59,12 @@ fail=0
 for pat in 'The Rule' 'Red Flags' 'DeepSeek Harness tool mapping' 'Dispatch a subagent' 'subagent_fork' 'Repository rules take precedence'; do
   if ! grep -q -- "$pat" "$OUT"; then echo "build-bootstrap: missing section: $pat" >&2; fail=1; fi
 done
+
+# Caveman vendored skills must survive assembly; fail loudly if a sync or
+# removal dropped one (same rule as the dsh-tools.md mis-delete lesson).
+for c in caveman caveman-commit caveman-review; do
+  [ -f "$PRESET/skills/$c/SKILL.md" ] || { echo "build-bootstrap: missing caveman skill: $c" >&2; exit 1; }
+done
 [ "$fail" -eq 0 ] || exit 1
 
 printf 'built %s (%s bytes, %s lines)\n' "$OUT" "$(wc -c < "$OUT")" "$(wc -l < "$OUT")"
