@@ -35,6 +35,8 @@ scripts/install.sh                  # 默认：真实目录 + 逐项符号链接
 scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器）
 ```
 
+`install.sh` 会自动重建机器本地依赖链接（`preset/node_modules/@deepseek-ai` → 已安装 harness 的依赖树）并在末尾运行插件自测，失败即中止安装。**换机后无需手动处理依赖，重新 clone 后直接跑 `install.sh` 即可。**
+
 之后**新建**一个会话，在模式选择器里选 `Superpowers 模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建。
 
 ### 为什么安装成"真实目录 + 符号链接"
@@ -53,6 +55,8 @@ preset 发现用 `readdir(root, { withFileTypes: true })` 并只接受 `isDirect
 cd preset/plugins/superpowers-bootstrap && node selftest.mjs
 # => selftest OK: 6 assertions groups passed / bootstrap bytes: 9061
 ```
+
+（`install.sh` 末尾已自动运行此自测，无需单独执行。）
 
 它驱动插件真正安装的 `agent/pre-step` 监听器，断言移植契约的三条性质：首次注入一次、不重复注入、压缩丢掉后重新注入；另外覆盖 user 角色与 plugin 来源标记、被拒绝的步、空步、已有消息的保留顺序。
 
