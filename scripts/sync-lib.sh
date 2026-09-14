@@ -7,6 +7,11 @@
 write_sync_section() {
   local label="$1" upstream="$2" url="$3"
   local file="$PRESET/SYNC.md"
+  # preset/ ships in the published package (package.json "files"), so the cache
+  # path is written relative to $HOME: a contributor's absolute home directory
+  # must never be baked into a released artifact. Falls back to the raw path
+  # when the cache lives outside $HOME (only when CACHE_ROOT overrides it).
+  local shown_upstream="${upstream/#$HOME/\~}"
 
   if [ ! -f "$file" ]; then
     printf '# 上游同步记录\n' > "$file"
@@ -23,7 +28,7 @@ write_sync_section() {
   {
     printf '\n## %s\n\n' "$label"
     printf -- '- 上游仓库: %s\n' "$url"
-    printf -- '- 本地缓存: %s\n' "$upstream"
+    printf -- '- 本地缓存: %s\n' "$shown_upstream"
     git -C "$upstream" log -1 --format='- commit: %H%n- date: %ad%n- subject: %s' --date=short
     if [ -f "$upstream/package.json" ]; then
       grep -m1 '"version"' "$upstream/package.json" | sed 's/^ */- package.json version: /'

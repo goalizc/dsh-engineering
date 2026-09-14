@@ -43,6 +43,10 @@ write_sync_section "Caveman" "$UPSTREAM" "$REPO_URL"
 
 # Keep the per-file content stamp in sync; this also runs the caveman presence
 # assertions in build-bootstrap.sh and fails loudly on drift.
+#
+# NOTE: this is the only bootstrap rebuild in the combined sync path.
+# sync-superpowers-skills.sh ends by calling this script and relies on the
+# rebuild here, so that a "sync both upstreams" run rebuilds exactly once.
 bash "$ROOT/scripts/build-bootstrap.sh" >/dev/null
 
 echo "caveman skills: ${#CAVEMAN_IDS[@]} synced -> $PRESET/skills/{${CAVEMAN_IDS[*]}}"

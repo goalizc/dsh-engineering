@@ -42,9 +42,37 @@ mkdir -p "$PRESET/skills"
 cp -R "$UPSTREAM/skills/." "$PRESET/skills/"
 
 # Re-apply the sanctioned Platform Adaptation pointer.
+#
+# The upstream body does not carry this line, so it must be inserted — but it
+# must land inside "## Platform Adaptation", right after the Antigravity entry.
+# A plain append to EOF once put it under "## User Instructions" instead. The
+# pass below is idempotent and repairs a misplaced line as well as a missing
+# one: it drops any pointer outside that section, then inserts one after the
+# Antigravity line unless the very next line already is the pointer.
 SKILL="$PRESET/skills/using-superpowers/SKILL.md"
-if ! grep -q 'references/dsh-tools.md' "$SKILL"; then
-  printf '%s\n' '- DeepSeek Harness: `references/dsh-tools.md`' >> "$SKILL"
+awk '
+  /^## /      { sec = $0 }
+  /^- Antigravity: / {
+    if (getline nxt > 0) {
+      if (nxt == "- DeepSeek Harness: `references/dsh-tools.md`") {
+        print; print nxt; next
+      }
+      print
+      print "- DeepSeek Harness: `references/dsh-tools.md`"
+      if (nxt ~ /^- DeepSeek Harness: / && sec != "## Platform Adaptation") next
+      print nxt
+      next
+    }
+    print; print "- DeepSeek Harness: `references/dsh-tools.md`"; next
+  }
+  /^- DeepSeek Harness: / && sec != "## Platform Adaptation" { next }
+  { print }
+' "$SKILL" > "$SKILL.tmp" && mv "$SKILL.tmp" "$SKILL"
+POINTER_SEC="$(awk '/^## /{sec=$0} /^- DeepSeek Harness:/{print sec}' "$SKILL")"
+if [ "$(grep -c '^- DeepSeek Harness: ' "$SKILL" || true)" -ne 1 ] \
+  || [ "$POINTER_SEC" != "## Platform Adaptation" ]; then
+  echo "pointer not anchored in ## Platform Adaptation (found: ${POINTER_SEC:-none})" >&2
+  exit 1
 fi
 
 # The full-directory replace above deletes repo-local files under skills/;
@@ -57,8 +85,13 @@ if [ ! -f "$ROOT/$TOOLS_REL" ] && git -C "$ROOT" rev-parse --verify --quiet "HEA
 fi
 
 write_sync_section "Superpowers" "$UPSTREAM" "$REPO_URL"
+echo "wrote $PRESET/SYNC.md"
 
-# The wholesale replace dropped the caveman skills; bring them back.
+# The wholesale replace dropped the caveman skills; bring them back. That call
+# also runs build-bootstrap.sh, so bootstrap.md is rebuilt for this sync too.
+# Rebuilding here as well would only run the same generated-file step twice, so
+# this script deliberately relies on the caveman path — the final rebuild in
+# this sync is always a function of the completed skills tree either way.
 bash "$ROOT/scripts/sync-caveman-skills.sh"
 
 echo "skills: $(find "$PRESET/skills" -name SKILL.md | wc -l) skills, $(find "$PRESET/skills" -type f | wc -l) files"
