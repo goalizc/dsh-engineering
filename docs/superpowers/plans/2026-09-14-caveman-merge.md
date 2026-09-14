@@ -226,15 +226,17 @@ Expected: 3 行 `OK <skill>`, 1 行 `OK brainstorming(已保留)`, 1 行 `TOTAL 
 
 - [ ] **Step 3: 临时 DSH_HOME 下 plant-core link 分支同样生效**
 
+> **勘误(2026-09-14, 实施后回填):** 原命令对逐文件 `[ -L .../caveman/SKILL.md ]` 断言在实测中失败。plant-core 的 `link` 策略是对安装目标**顶层 `skills` 目录整体**创建符号链接(见 `plant-core.mjs` 的link分支),并非对每个技能文件逐文件 symlink;且用相对 `source`(`preset`)会生成不可解析的相对链接。正确的验收是: 用绝对 source(如 `"$(pwd)/preset"`),并断言顶层 `[ -L "$W/superpowers/skills" ]` 加上 `[ -f "$W/superpowers/skills/caveman/SKILL.md" ]` 可解析。plant-core 属既有稳定代码,此缺陷是验收脚本写法问题,非本计划回归。
+
 ```bash
 cd /home/goalizc/superpowers-dsh
 W=$(mktemp -d)
-node scripts/plant-core.mjs install preset "$W" --name superpowers --policy link
-[ -L "$W/superpowers/skills/caveman/SKILL.md" ] && echo "LINK OK caveman" || { echo "not a symlink" >&2; exit 1; }
-[ -f "$W/superpowers/skills/caveman/SKILL.md" ] && echo "RESOLVES OK"
+node scripts/plant-core.mjs install "$(pwd)/preset" "$W" --name superpowers --policy link
+[ -L "$W/superpowers/skills" ] && echo "LINK OK skills(top-level)" || { echo "skills not a symlink" >&2; exit 1; }
+[ -f "$W/superpowers/skills/caveman/SKILL.md" ] && echo "RESOLVES OK caveman"
 rm -rf "$W"
 ```
-Expected: `LINK OK caveman` 与 `RESOLVES OK`(link 策略下为指向检出源的符号链接, 且可读)。
+Expected: `LINK OK skills(top-level)` 与 `RESOLVES OK caveman`(link 策略下为指向检出源 `preset/skills` 的顶层符号链接,且可读)。
 
 - [ ] **Step 4: 工作区干净 + 提交历史核对**
 
