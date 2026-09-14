@@ -44,6 +44,23 @@ echo "composition: $DEST/agent.cordis.yml"
 echo "verify:      sp_probe validate=engineering   (from a session with the probe mounted)"
 echo "next:        start a new session and pick it in the agent-preset picker"
 
+# The id changed superpowers -> engineering. An install that predates the rename
+# keeps working: its rows still resolve (they symlink back into this checkout),
+# so the picker lists TWO identically named 工程模式 and a `settings.yaml`
+# default of `superpowers` still resolves to the OLD directory. Report that and
+# stop there — deleting a directory under the user's DSH home is theirs to do.
+LEGACY="$DEST_ROOT/superpowers"
+if [ -d "$LEGACY" ]; then
+  echo
+  echo "WARNING: legacy preset directory still installed: $LEGACY" >&2
+  echo "         the preset id changed (superpowers -> engineering). Both directories" >&2
+  echo "         now show up as 工程模式 in the picker, and 'agent-presets.default:" >&2
+  echo "         superpowers' in settings.yaml still resolves to the old copy." >&2
+  echo "         This script never deletes it. After checking nothing else needs it:" >&2
+  echo "             rm -rf \"$LEGACY\"" >&2
+  echo "         and change settings.yaml to 'agent-presets.default: engineering'." >&2
+fi
+
 # Cheap porting-contract checks; fail loudly instead of silently shipping a
 # broken preset to a new machine. The gate covers EVERY preset-local plugin by
 # iterating the directory — never a hand-written list, which is how a newly

@@ -94,6 +94,24 @@ preset 发现用 `readdir(root, { withFileTypes: true })` 并只接受 `isDirect
 
 预设本地插件**自包含**：不 import 任何 harness 包（构造注入消息用 `node:crypto` 复刻 `createUserMessage` 的形状）。原因是本地创作的 preset 位于用户家目录，Node 的 `node_modules` 上行查找到不了 harness 自己的包，而 `--copy` 安装模式连链接都没有。这也是 `bootstrap/index.js` 与 `caveman-command/index.js` 各持一份**语义相同**的消息构造代码的原因——两份里 `deepFreeze` 逐字相同，`createUserMessage` 只是排版不同；不变量是**字段（`role`/`content`/`source`）、深冻结与全新 UUID**，不是字节。跨安装布局没有共享模块可用，改一处必须同 commit 改另一处。
 
+### 从旧 id `superpowers` 升级（破坏性）
+
+preset id 已从 `superpowers` 改为 `engineering`。**旧安装不会自己消失，也不会报错**：
+
+- `<DSH_HOME>/.agent-presets/superpowers/` 若还在，模式选择器会同时列出**两个 `工程模式`**。旧目录的条目符号链接回同一份检出，所以它看起来一样健康、内容也一样——但刷新只写 `engineering/`，旧目录从此不再更新。
+- `settings.yaml` 里的 `agent-presets.default: superpowers` 仍然解析得到（指向旧目录），所以它不会失败提醒你改名。
+- 旧会话记录里的 preset 名是历史值，不改写。
+
+清理步骤（删除用户目录是不可逆的，脚本一律不代劳）：
+
+```sh
+# 1. 确认没有别的用途后删除旧目录
+rm -rf "${DSH_HOME:-$HOME/.dsh}/.agent-presets/superpowers"
+# 2. 把默认值改成新 id：settings.yaml 里 agent-presets.default: engineering
+```
+
+`scripts/install.sh` 检测到同级仍存在旧 `superpowers/` 目录时会**打印上述告警**，但绝不自动删除。
+
 ## 上游同步
 
 两个脚本都**自管缓存**，无需传入上游路径：
