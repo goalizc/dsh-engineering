@@ -100,6 +100,15 @@
 - id: tool-goal
   name: '@deepseek-ai/dsh-tool-goal'
 
+# ── caveman command ─────────────────────────────────────────────────────────
+
+# The `/caveman` command. Preset-local and self-contained: the `caveman` skill
+# declares a `/caveman <level>` contract, but that syntax ships upstream as a
+# Claude Code slash command this harness does not have. The row name is a
+# preset-relative specifier, so the loader resolves it against this preset.
+- id: caveman-command
+  name: './plugins/caveman-command/index.js'
+
 # ── plan mode ───────────────────────────────────────────────────────────────
 
 # Plan state is per-agent by nature, so an entry-local realm is not a
