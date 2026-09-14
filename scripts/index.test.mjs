@@ -16,5 +16,12 @@ test('doInstall plants bundled preset to destRoot/engineering', async () => {
   const r = await doInstall({ destRoot });
   assert.equal(r.action, 'planted');
   const comp = await readFile(join(destRoot, 'engineering', 'agent.cordis.yml'), 'utf8');
-  assert.ok(comp.includes('plugins/bootstrap'));
+  // The exact mount line, not a substring: the composition's own prose also
+  // names `plugins/bootstrap` (in a comment above the row), so a bare
+  // `includes('plugins/bootstrap')` still passed with the row deleted.
+  assert.match(
+    comp,
+    /^\s*name: '\.\/plugins\/bootstrap\/index\.js'$/m,
+    `the composition must carry the bootstrap mount row; got:\n${comp}`,
+  );
 });
