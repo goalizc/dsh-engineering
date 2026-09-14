@@ -64,8 +64,15 @@ const DEFAULT_LEVEL = 'full'
  * Lifetime is this process. After a restart (including a resumed session in a
  * new process) the map is empty again, so a bare `/caveman` falls back to
  * `DEFAULT_LEVEL` even though the session's own messages still carry the level
- * the model is following. That gap is display-only: the model's behaviour comes
- * from the durable announcement, never from this map.
+ * the model is following.
+ *
+ * Two limits follow; both are display-or-context limits, not crashes.
+ * (1) After a restart the echoed level is the default rather than what the user
+ * last set. (2) The `set` path's announcement is ordinary conversation history,
+ * so a compaction that folds it away drops the level from the model's context,
+ * at which point the re-injected bootstrap asserts `full` again. The level is
+ * therefore durable only until compaction; re-injecting the current level would
+ * close that, and is deliberately not attempted here.
  */
 const levelByAgent = new Map()
 

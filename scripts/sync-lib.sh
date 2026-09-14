@@ -8,16 +8,16 @@ write_sync_section() {
   local label="$1" upstream="$2" url="$3"
   local file="$PRESET/SYNC.md"
   # preset/ ships in the published package (package.json "files"), so no
-  # machine-specific path may be baked into this generated file. The cache is
-  # shown relative to THIS repository's root when it lives inside it (the
-  # default: <repo>/.cache/<upstream>), which is portable and still tells a
-  # reader where to look. A CACHE_ROOT outside the repository cannot be
-  # expressed portably, so it falls back to the `$UPSTREAM` placeholder the
-  # file carried before the cache became script-managed.
+  # machine-specific path may be baked into this generated file. A cache inside
+  # the checkout (the default: <repo>/.cache/<upstream>) is shown relative to the
+  # repository root, which is portable and still tells a reader where to look.
   #
-  # Relativizing against $HOME is deliberately NOT done: that is what leaked
-  # `~/superpowers-dsh/.cache/...` into a release artifact (the home directory
-  # happens to repeat the checkout's directory name, which is local fact).
+  # Relativizing against the user's home directory was the earlier attempt and is
+  # deliberately NOT used: it leaked a home-relative absolute path into a release
+  # artifact, because the home directory happens to repeat this checkout's
+  # directory name — local fact, not something the file should carry. A cache
+  # outside the repository has no portable spelling, so it falls back to the
+  # placeholder the file carried before the cache became script-managed.
   local repo_root shown_upstream note
   repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   case "$upstream" in

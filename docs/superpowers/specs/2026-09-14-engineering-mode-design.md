@@ -252,7 +252,7 @@ cat .cache/caveman/.git/HEAD 2>/dev/null || true
 git check-ignore -v .cache                           # 期望命中 .gitignore
 
 # 回归
-npm test                                             # 期望 15 passed
+npm test                                             # 期望 0 failed（计数随收编而变，见 §8bis E1）
 node preset/plugins/bootstrap/bootstrap.test.mjs     # 期望 selftest OK
 ```
 
@@ -276,18 +276,17 @@ node preset/plugins/bootstrap/bootstrap.test.mjs     # 期望 selftest OK
 并把插件自测扩到 8 组，故 `npm test` 现在是 **18 passed / 0 failed**。计数随每次收编而变——
 上面 §8 里的数字不是契约，**`0 failed` 才是**。
 
-**E2 — 替代 §8 的改名断言（实测干净）**
+**E2 — 替代 §8 的改名断言（权威版本在 README，勿在此复制）**
+
+本节原先内联了一份 grep；实施期发现内联副本会与 README 版本**各自漂移**，且本文件内联的版本还遗漏了一个自匹配来源（命令自身含被检串）。故**不再内联**，以 `README.md` 的「验证」一节为唯一权威：
 
 ```sh
-# 只搜已追踪文件：git grep 天然排除 gitignored 的账本与 manifest
-git grep -n "@superpowers-dsh\|superpowers-dsh\|Superpowers 模式\|superpowers-installer\|superpowers-bootstrap" -- . \
-  | grep -v "^docs/superpowers/" | grep -v "^preset/skills/" | grep -v "^preset/bootstrap.md" \
-  | grep -v "^preset/SYNC.md" | grep -v "^THIRD-PARTY-NOTICES.md" \
-  | grep -v "^docs/feasibility-report.md" | grep -v "^evidence/VERIFICATION.md"   # 期望 exit=1
-
-# 反向断言：上游署名必须存活 —— 改名若抹掉署名是缺陷，不是成功
+# 见 README.md 验证一节（含 `:!README.md` 自排除）。期望 exit=1。
+# 反向断言也在那里：上游署名必须存活 —— 改名若抹掉署名是缺陷，不是成功。
 git grep -c "obra/superpowers" -- README.md THIRD-PARTY-NOTICES.md preset/SYNC.md   # 期望各非零
 ```
+
+**教训（写入本文档以免重犯）**：任何"残留检查"若把被检串写进自己的命令行，就必然自匹配；且**同一检查存在两份副本时，两份都会漂移**。检查只应有一份，其余位置引用它。
 
 **E3 — 第 2 层拆成 2a 与 2b，其中 2a 在本仓库可自动化**
 

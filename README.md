@@ -159,7 +159,7 @@ git grep -nE 'superpowers-bootstrap|superpowers-installer|@superpowers-dsh|Super
 git grep -c 'obra/superpowers' -- README.md THIRD-PARTY-NOTICES.md preset/SYNC.md
 ```
 
-排除项逐条：`docs/`、`evidence/` 是 spec §5.3 裁定冻结的历史记录（记录的是当时真实跑过的旧名命令），`preset/skills/` 是上游正文，`scripts/sync-superpowers-skills.sh` 的名字取自上游；README 的命中只出现在「从旧 id `superpowers` 升级」一节——那里必须写出旧 id 才能给出迁移步骤。
+排除项逐条：`docs/`、`evidence/` 是 spec §5.3 裁定冻结的历史记录（记录的是当时真实跑过的旧名命令），`preset/skills/` 是上游正文，`scripts/sync-superpowers-skills.sh` 的名字取自上游。README 需排除有**两个**原因：升级一节必须写出旧 id 才能给出迁移步骤，且**上面这条 grep 命令自身**就含被检的模式串。
 
 bootstrap 自测断言移植契约的三条性质：首次注入一次、不重复注入、压缩丢掉后重新注入；另外覆盖 user 角色与 plugin 来源标记、被拒绝的步、空步、已有消息的保留顺序。caveman 自测覆盖 7 个级别的解析往返（名字钉死字面量）、注册形状、`/caveman` 裸调用报**当前**级别且不注入、级别的按会话隔离、非法输入报错且不注入。
 
@@ -212,7 +212,7 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
 | 可视化伴侣 | brainstorming 的可选本地服务器可用 `bash run_in_background` 起；但要人类自己打开 URL。遥测可用 `SUPERPOWERS_DISABLE_TELEMETRY=1` 关闭 |
 | 不承诺硬性门禁 | DSH 没有能真正阻断"模型跳过技能直接写代码"的原语。本模式是强引导 + 可观察性，不是强制流程 |
 | 级别切换依赖本仓库插件 | `/caveman` 是本仓库实现；上游的 slash command 形态在 DSH 不适用，删掉这个插件级别切换即失效 |
-| 裸 `/caveman` 的"当前级别"只在进程内记得 | 级别按会话存在插件的内存里（`invocation.agent.id` 为键），重启/新进程后裸 `/caveman` 回落显示默认 `full`。级别本身不丢——它写在会话的持久消息里，模型行为始终以那条公告为准，所以这是显示层缺口 |
+| 裸 `/caveman` 的"当前级别"只在进程内记得 | 级别按会话存在插件的内存里（`invocation.agent.id` 为键），重启/新进程后裸 `/caveman` 回落显示默认 `full`（显示层缺口）。更实质的一条：级别公告是**普通会话历史**，压缩若把它折掉，模型上下文里的级别随之丢失，而重新注入的 bootstrap 会再断言默认 `full` —— 即级别只持久到压缩为止。要彻底闭合需把当前级别一并重新注入，本仓库刻意未做 |
 | 上游同步是手动的 | 没有定时任务也没有 CI：运行两个 sync 脚本，然后 `build-bootstrap.sh` 与 `install.sh` |
 
 ## 上游与许可
