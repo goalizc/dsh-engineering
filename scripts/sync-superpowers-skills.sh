@@ -1,22 +1,42 @@
 #!/usr/bin/env bash
-# Sync the vendored Superpowers skills from an upstream checkout.
+# Sync the vendored Superpowers skills from a self-managed upstream cache.
 #
-# Superpowers skills are the upstream source of truth and are reused verbatim;
-# this repository never edits a skill body. The only exception is the pointer
-# line in `using-superpowers/SKILL.md`'s "Platform Adaptation" section that
-# names this harness's tool-mapping reference — the one edit the upstream
-# porting guide sanctions. It is re-applied here after every sync.
+# Skills are the upstream source of truth and are reused verbatim; this
+# repository never edits a skill body. The only exception is the pointer line in
+# `using-superpowers/SKILL.md`'s "Platform Adaptation" section that names this
+# harness's tool-mapping reference — the one edit the upstream porting guide
+# sanctions. It is re-applied here after every sync.
 #
-# Usage: scripts/sync-superpowers-skills.sh <path-to-superpowers-checkout>
+# Usage: scripts/sync-superpowers-skills.sh
+#   CACHE_ROOT overrides where the upstream cache lives (default: <repo>/.cache)
+#
+# NOTE: this script REPLACES preset/skills wholesale. Caveman skills are a
+# partial vendee living in the same directory, so they are re-synced at the end
+# to avoid silently deleting them.
 set -euo pipefail
 
-UPSTREAM="${1:?usage: sync-superpowers-skills.sh <path-to-superpowers-checkout>}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PRESET="$ROOT/preset"
+CACHE_ROOT="${CACHE_ROOT:-$ROOT/.cache}"
+UPSTREAM="$CACHE_ROOT/superpowers"
+REPO_URL="https://github.com/obra/superpowers.git"
+PIN="d884ae04edebef577e82ff7c4e143debd0bbec99"
+
+# Fetch-or-update the cache, then check out the pinned commit. Never tracks a
+# moving branch: a sync must be reproducible.
+if [ ! -d "$UPSTREAM/.git" ]; then
+  mkdir -p "$CACHE_ROOT"
+  git clone --filter=blob:none "$REPO_URL" "$UPSTREAM"
+fi
+git -C "$UPSTREAM" fetch --tags --quiet origin
+git -C "$UPSTREAM" checkout --quiet "$PIN"
 
 [ -d "$UPSTREAM/skills" ] || { echo "not a superpowers checkout: $UPSTREAM" >&2; exit 1; }
 
-echo "syncing skills from $UPSTREAM"
+# shellcheck source=scripts/sync-lib.sh
+. "$ROOT/scripts/sync-lib.sh"
+
+echo "syncing skills from $UPSTREAM at $PIN"
 rm -rf "$PRESET/skills"
 mkdir -p "$PRESET/skills"
 cp -R "$UPSTREAM/skills/." "$PRESET/skills/"
@@ -36,15 +56,9 @@ if [ ! -f "$ROOT/$TOOLS_REL" ] && git -C "$ROOT" rev-parse --verify --quiet "HEA
   echo "restored $ROOT/$TOOLS_REL (repo-local tool mapping)"
 fi
 
-{
-  echo "# 上游同步记录"
-  echo
-  echo "- 上游仓库: $(git -C "$UPSTREAM" remote get-url origin 2>/dev/null || echo unknown)"
-  echo "- 本地检出: $UPSTREAM"
-  git -C "$UPSTREAM" log -1 --format='- commit: %H%n- date: %ad%n- subject: %s' --date=short
-  grep -m1 '"version"' "$UPSTREAM/package.json" | sed 's/^ */- package.json version: /'
-  echo "- 同步时间: $(date -Iseconds)"
-} > "$PRESET/SYNC.md"
+write_sync_section "Superpowers" "$UPSTREAM" "$REPO_URL"
+
+# The wholesale replace dropped the caveman skills; bring them back.
+bash "$ROOT/scripts/sync-caveman-skills.sh"
 
 echo "skills: $(find "$PRESET/skills" -name SKILL.md | wc -l) skills, $(find "$PRESET/skills" -type f | wc -l) files"
-echo "wrote $PRESET/SYNC.md"

@@ -10,3 +10,6 @@ preset/.manifest.json
 
 # SDD 进度账本等工作区草稿（不入库）
 .superpowers/
+
+# 自管的上游检出缓存（sync 脚本自动 clone/fetch；可重建，不入库）
+.cache/
