@@ -1,0 +1,11 @@
+{
+  "name": "dsh-caveman-command",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Registers the /caveman command that sets this session's output compression level.",
+  "main": "index.js",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  }
+}

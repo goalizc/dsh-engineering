@@ -47,7 +47,17 @@ import { fileURLToPath } from 'node:url'
 /** Cordis plugin name. */
 const name = 'superpowers-bootstrap'
 
-/** Deep-freeze a message the way the harness publishes its own messages. */
+/**
+ * Deep-freeze a message the way the harness publishes its own messages.
+ *
+ * INTENTIONAL DUPLICATION (ruled by the plan, verified by review): `deepFreeze`
+ * and `createUserMessage` below are kept verbatim-identical to the copies in
+ * `preset/plugins/caveman-command/index.js` (see its matching note). A
+ * preset-local plugin must stay self-contained and must not import any
+ * `@deepseek-ai/*` package, so neither the harness's helper nor a shared
+ * sibling module is available across install layouts. If you change the message
+ * shape here, change it there in the same commit — the two must not drift.
+ */
 function deepFreeze(value) {
   if (value instanceof Object && !Object.isFrozen(value)) {
     Object.freeze(value)
