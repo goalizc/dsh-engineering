@@ -10,6 +10,6 @@
   "publishConfig": { "access": "public" },
   "scripts": {
     "build:manifest": "node scripts/build-manifest.mjs preset --out preset/.manifest.json",
-    "test": "node --test scripts/"
+    "test": "node --test scripts/*.test.mjs"
   }
 }
