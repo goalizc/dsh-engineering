@@ -78,3 +78,23 @@ test('the injected section overrides the vendored Red Flags decision', async () 
       'and re-run it.',
   );
 });
+
+// The persona states the policy in prose, and nothing generates that line, so
+// it drifts on its own — the same coupling the default-level guard exists for.
+// Asserting the ABSENCE of the old sentence is the point: leaving it in place
+// makes the composition disagree with the section it points at.
+test('the composition persona gates skills by track instead of mandating them', async () => {
+  const composition = await read('../preset/agent.cordis.yml');
+  assert.ok(
+    composition.includes('Task sizing (harness override)'),
+    'preset/agent.cordis.yml must point the persona at the injected ' +
+      '"Task sizing (harness override)" section; otherwise the persona and ' +
+      'the section disagree about whether every skill is unconditional.',
+  );
+  assert.ok(
+    !composition.includes('Skills are mandatory workflows, not suggestions.'),
+    'preset/agent.cordis.yml still carries the unconditional "Skills are ' +
+      'mandatory workflows, not suggestions." sentence, which contradicts the ' +
+      'injected task-sizing section. Replace it with the track-scaled wording.',
+  );
+});
