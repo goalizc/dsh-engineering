@@ -259,3 +259,105 @@ $ node scripts/verify-composition.mjs
 `preset/bootstrap.md` 是生成物，经 `scripts/install.sh` 以符号链接装入
 `${DSH_HOME}/.agent-presets/engineering/`。本次改动**只在新建会话生效**，
 当前会话看不到——与本仓库既有结论一致。
+
+## 2026-09-16 git 安装兜底清单 + 包名收敛复验
+
+改动：`plant()` 三级清单解析 + `MANIFEST_EXCLUDES`；`index.js` 可操作失败提示与
+来源标记；包名改 `@goalizc/dsh-engineering`；新增 `scripts/bundle-identity.test.mjs`。
+
+### 第 1 层：`npm test`
+
+```
+$ npm test
+ℹ tests 33
+ℹ pass 33
+ℹ fail 0
+ℹ skipped 0
+```
+
+### git 路径的等价实验
+
+`git clone` 的检出里没有清单（与 GitHub 安装拿到的树形状一致）：
+
+```
+$ git clone -q . .tmp-e2e/clone
+$ test ! -e .tmp-e2e/clone/preset/.manifest.json && echo "clone has no manifest: OK"
+clone has no manifest: OK
+$ (cd .tmp-e2e/clone && npm pack --pack-destination "$OLDPWD/.tmp-e2e")
+goalizc-dsh-engineering-0.1.0.tgz
+$ tar -tzf <clone tgz> | grep -c 'preset/.manifest.json'
+0
+$ tar -tzf <clone tgz> | wc -l
+71
+```
+
+装进临时 profile 并启动：
+
+```
+$ DSH_HOME=<临时> dsh plugin --profile headless add <clone tgz> --store-dir ... --cache-dir ...
+Progress: resolved 1, reused 0, downloaded 1, added 1, done
+Done in 1s using pnpm v11.26.0
+$ DSH_HOME=<临时> dsh --profile headless "reply ok"
+engineering: preset planted (65 changed) (manifest computed)
+
+dsh: MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"; …
+```
+
+植入结果与组合健康：
+
+```
+文件数: 66
+SKILL.md: 17
+$ DSH_HOME=<临时> node scripts/verify-composition.mjs
+2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves. …
+```
+
+（`MISSING_CREDENTIAL` 是临时 profile 没有模型凭据，与本改动无关，植入发生在此之前。）
+
+### npm 路径回归
+
+```
+$ npm pack --pack-destination .tmp-npm
+goalizc-dsh-engineering-0.1.0.tgz
+$ tar -tzf <repo tgz> | grep -c 'preset/.manifest.json'
+1
+$ dsh plugin --profile headless add <repo tgz> ...
+Done in 1s using pnpm v11.26.0
+$ DSH_HOME=<临时> dsh --profile headless "reply ok"
+engineering: preset planted (65 changed)
+文件数: 66
+```
+
+**无** `(manifest computed)` —— npm 路径仍优先使用包内清单，没有退化。
+
+### 常规门禁
+
+```
+$ bash scripts/build-bootstrap.sh
+built /home/goalizc/dsh-engineering/preset/bootstrap.md (11729 bytes, 230 lines)
+$ git diff --exit-code preset/bootstrap.md; echo "drift exit=$?"
+drift exit=0
+$ node scripts/verify-composition.mjs
+2a OK: "engineering" is a loadable roster row (broken: null) …
+```
+
+### 反向取证
+
+| 断言 | 制造违规 | 结果 | 还原后 |
+|---|---|---|---|
+| 现算集合与发布清单逐键相等 | `MANIFEST_EXCLUDES` 改为 `[]` | `pass 13 / fail 1`：`Expected values to be strictly deep-equal` | `pass 14 / fail 0` |
+| patch 自指 == 包名 | 自指行改成 `@goalizc/wrong-name` | `pass 3 / fail 1`：`must insert a row named "@goalizc/dsh-engineering" … got "@goalizc/wrong-name"` | `pass 4 / fail 0` |
+
+两次取证分别在对应提交之后执行，`git checkout --` 还原，未混入任何提交。
+
+### 计划外增补（如实记录）
+
+spec §8.4 预期 29 例；实施时在 `scripts/index.test.mjs` 额外加了 4 例（`formatResult`
+的来源标记两例、`formatError` 内容一例、`apply()` 不抛一例），故终值为 33。理由：失败
+姿态是用户可见行为，值得守卫，而不是只靠端到端覆盖。
+
+### 未验证（诚实清单）
+
+真机 `dsh plugin add github:goalizc/dsh-engineering` **未验证**：沙箱无任何 git 凭据，
+本次改动未能推送。等价实验用「本地 clone → 本地 tarball」，树形状与 GitHub 安装一致
+（被 gitignore 的清单在两者中都不存在）。推送后由人类真机复验一次即可闭环。

@@ -89,6 +89,7 @@ dsh-engineering/
 │   ├── index.test.mjs               # 安装器插件测试
 │   ├── plant-core.test.mjs          # 植入引擎测试
 │   ├── caveman-default-level.test.mjs  # 三个家的默认级别 + 插件级别名 == vendored 技能
+│   ├── bundle-identity.test.mjs     # 守卫：包名 == patch 自指、dsh.bundle.patch 存在、files 齐备
 │   └── vendored-skills.test.mjs     # 白名单 caveman 技能必须在（半同步树不得通过 npm test）
 ├── docs/                            # 设计与可行性记录（含上游的 skills 撰写约定）
 ├── evidence/VERIFICATION.md         # 历史验证记录
@@ -106,6 +107,19 @@ scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器
 `install.sh` 末尾遍历 `preset/plugins/*/` 运行**每个**预设本地插件的自测（当前是 `bootstrap` 与 `caveman-command`），任一失败即中止安装并明确报错；某个插件缺少同名 `<name>.test.mjs` 同样直接失败——插件名单不写死，新增插件自动纳入门禁，"新增插件必须带自测"因此是门禁的一部分，避免把坏 preset 静默装到新机器上。
 
 之后**新建**一个会话，在模式选择器里选 `工程模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建——安装完成后继续用旧会话是看不到的。
+
+### 通过 `dsh plugin add` 安装（bundle 通道）
+
+```sh
+dsh plugin --profile <name> add /path/to/goalizc-dsh-engineering-0.1.0.tgz   # 本地 tarball
+dsh plugin --profile <name> add github:goalizc/dsh-engineering               # GitHub
+```
+
+`dsh plugin` 必须带 `--profile`（实现上它把余下参数转发给该 profile 目录里的 pnpm），因此它能装的东西 = pnpm 能装的东西：tarball、git、本地目录都行，裸 registry 包名则需要先发布。
+
+加进 profile **不等于**已植入：`add` 只登记 `dsh.profile.bundles` 并把 patch 层组合进去，`~/.dsh/.agent-presets/engineering/` 是**启动该 profile 时**由 `index.js` 的 `apply()` 植入的。
+
+git 来源的检出里没有 `preset/.manifest.json`（它被 gitignore，只有 npm 打包时经 `files` 白名单带入）。植入引擎因此在文件缺失时按与生成器相同的规则现算，成功日志会追加 `(manifest computed)` 以标明走的是哪条路径。植入失败**不会**中断宿主启动，但会打印含 preset id、原始错误与排查方向的警告。
 
 ### 为什么安装成"真实目录 + 符号链接"
 
@@ -156,10 +170,10 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 21 pass / 0 fail
+npm test          # 33 pass / 0 fail
 ```
 
-这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫）以及 `preset/plugins/*/*.test.mjs`（两个插件的自测）。两个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
+这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫）以及 `preset/plugins/*/*.test.mjs`（两个插件的自测）。两个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
 
 ```sh
 node preset/plugins/bootstrap/bootstrap.test.mjs
