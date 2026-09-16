@@ -11,19 +11,36 @@
 
 上游技能**逐字复用**，不改写任何技能正文——这是上游移植规则的要求，也让升级同步变成一次目录复制。适配只发生在三处：一份工具映射文件、一段 bootstrap 拼装、两个 preset 本地插件。
 
-## 自动生效的三件事（第三件刻意"不生效"）
+## 自动生效的四件事（其中一件刻意"不生效"）
 
 | 能力 | 保障方式 |
 |---|---|
 | `using-superpowers` 引导 | 正文**注入**（`agent/pre-step`），每会话必达 |
 | Caveman 默认 `full` 与流程产物优先级 | 同上，注入 `bootstrap.md` 的 "Caveman output style" 一节 |
 | Caveman 级别定义 | **技能**保留在 catalog，按需加载 |
+| **任务分档**（按规模缩放流程） | 注入 `bootstrap.md` 的 "Task sizing (harness override)" 一节，覆盖上游的无条件表述 |
 
-第三行是刻意的，也是这套设计里唯一的不对称：注入**没有**宣告 `caveman` 技能已激活，反而明说 "It is NOT active yet: load it with the `skill` tool"。
+`Caveman 级别定义` 那行是刻意的，也是这套设计里唯一的不对称：注入**没有**宣告 `caveman` 技能已激活，反而明说 "It is NOT active yet: load it with the `skill` tool"。
 
 为什么不对称：`using-superpowers` 是**静态引导**——它要求的行为在会话生命周期内不变，所以把整段正文注入、并禁止再次加载是安全的，也免掉了每个会话一次的工具往返。`caveman` 不同，它是**带运行时可调参数的风格规则**：级别可以在会话中途被切换，规则文本必须能从 catalog 里被重新读取。若像 bootstrap 那样把 `caveman` 的正文宣告为"已激活、勿加载"，级别切换就没有任何可达路径——模型手里只有注入时那一刻的默认值。所以注入只写**默认值与优先级**（默认 full、流程产物优先、7 个合法级别名），规则正文单份留在技能内，切换时按需加载。
 
 同理，`/caveman` 命令本身只**宣告级别**，不重复规则文本：规则只有技能这一个家，避免两处文本漂移。
+
+## 任务分档（按规模缩放流程）
+
+Superpowers 全流程不再无条件施加到每个任务。注入文本里有一节 `## Task sizing (harness override)`（生成物 `preset/bootstrap.md`，源自 `scripts/build-bootstrap.sh` 的 FOOTER here-doc），按可核查的改动半径选档：
+
+| 档 | 进入条件 | 保留 | 免掉 |
+|---|---|---|---|
+| **A 直接改** | ≤3 文件 且 diff ≤50 行，不碰公共契约，非不可逆 | 一行轨道声明 + 跑既有验证并引用真实输出 | brainstorming、spec、plan、子代理、TDD |
+| **B 轻量** | ≤5 文件，意图无歧义 | 上述 + TDD | spec、plan、子代理 |
+| **C 完整** | 其余一切 | 现状全流程 | 无 |
+
+四族硬闸**命中即 C，与半径无关**：**G1** 不可逆或外部可见、**G2** 公共契约面、**G3** 安全与正确性高风险面、**G4** 安全网自改（删测试、关校验、改本规则或其执行机制、改安装发布链路）。此外：爆炸半径无法靠阅读确定、同时落在 ≥2 个契约类、拿不准 —— 一律 C。只升不降；用户可一句话改档（「走完整流程」/「别搞流程」）。
+
+这一节的覆盖对象是 vendored `using-superpowers` 正文里那行 Red Flags（`| "The skill is overkill" | ... | Use it. |`）与 1% 规则 —— 上游正文逐字不改，所以覆盖物必须同为注入文本。守卫在 `scripts/task-sizing.test.mjs`：生成物含三档与四族、注入节零项目专有名词、承重覆盖句点名上游两处、persona 不再自相矛盾。
+
+代价：`preset/bootstrap.md` 每会话常驻多 `1946` 字节（实测差值，见 `evidence/VERIFICATION.md`）。改动**只在新建会话生效** —— bootstrap 是生成物且经符号链接安装。
 
 ## 级别切换
 
@@ -139,10 +156,10 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 18 pass / 0 fail
+npm test          # 21 pass / 0 fail
 ```
 
-这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性）以及 `preset/plugins/*/*.test.mjs`（两个插件的自测）。两个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
+这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫）以及 `preset/plugins/*/*.test.mjs`（两个插件的自测）。两个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
 
 ```sh
 node preset/plugins/bootstrap/bootstrap.test.mjs

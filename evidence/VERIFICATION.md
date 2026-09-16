@@ -192,3 +192,70 @@ specifier（包名走上行 `node_modules` 查找，`./` 相对行 stat 文件�
 与上文 2026-09-12 的「尚未验证」清单一致，其中 2b 的残余部分是**真挂载**（`sp_probe validate=engineering`）
 与**技能目录断言**（`sp_verify preset=engineering cwd=…`）——两者都需要本仓库之外的探针工具；
 第 3 层端到端仍需人类新建会话验收。
+
+## 2026-09-16 任务分档（按规模缩放流程）复验
+
+改动：`scripts/build-bootstrap.sh` 的 FOOTER 新增 `## Task sizing (harness override)`
+节与 self-check 三条 pattern；`preset/agent.cordis.yml` persona 改为按档位生效；
+新增 `scripts/task-sizing.test.mjs`（3 个守卫）。
+
+### 第 1 层：`npm test`
+
+```
+$ npm test
+ℹ tests 21
+ℹ pass 21
+ℹ fail 0
+ℹ skipped 0
+```
+
+### 生成物与脚本一致（幂等）
+
+```
+$ bash scripts/build-bootstrap.sh
+built /home/goalizc/dsh-engineering/preset/bootstrap.md (11729 bytes, 230 lines)
+$ git diff --exit-code preset/bootstrap.md; echo "drift exit=$?"
+drift exit=0
+```
+
+### 注入节体量（每会话常驻成本）
+
+- 改前：`9783` bytes / `192` lines
+- 改后：`11729` bytes / `230` lines
+- 差值：`+1946` bytes / `+38` lines
+
+### 反向取证（每条断言都能转红）
+
+| 断言 | 制造违规 | 结果 | 还原后 |
+|---|---|---|---|
+| `bootstrap.md` 含 `**G4**` | `sed -i 's/\*\*G4\*\*/G4/' preset/bootstrap.md` | `pass 0 / fail 1`：`must contain "**G4**"` | `pass 1 / fail 0` |
+| 承重覆盖句点名 1% 规则 | `sed -i 's/This section overrides the "1% chance" rule/This section notes the "1% chance" rule/' preset/bootstrap.md` | `pass 1 / fail 1`：`must name what it overrides` | `pass 2 / fail 0` |
+| persona 不再含旧无条件句 | `printf '      Skills are mandatory workflows, not suggestions.\n' >> preset/agent.cordis.yml` | `pass 2 / fail 1`：`still carries the unconditional` | `pass 3 / fail 0` |
+
+三次取证分别在对应提交之后执行，`git checkout --` 还原，未混入任何提交。
+
+### 第 2a 层：组合健康
+
+```
+$ node scripts/verify-composition.mjs
+  roster       : [{"id":"engineering","name":"工程模式","order":5,"broken":null,"path":"/home/goalizc/.dsh/.agent-presets/engineering/agent.cordis.yml"}]
+
+2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves. Mounting, row configs, realms and the skills catalog are layer 2b.
+```
+
+### 执行期发现的计划缺陷（已就地修正）
+
+1. Task 3 红阶段的失败信息是 `must point the persona at ...`（第一条断言先失败），
+   计划里写的是第二条断言的信息 `still carries the unconditional`。两条断言当时都未
+   满足，红阶段成立，仅期望信息写错。
+2. `require('yaml')` 在本仓库根**不可解析**（`yaml` 只存在于 harness 的 `node_modules`）。
+   校验组合文件解析需用绝对路径：
+   `node -e "...require('/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/yaml')..."`。
+   实测 `rows: 20`，persona 行已是按档位措辞。解析时 `!!js` 标签报 `TAG_RESOLVE_FAILED`
+   警告属**改动前既有**（`disabled: !!js ...` 三处），真实挂载由第 2a 层证明。
+
+### 生效边界
+
+`preset/bootstrap.md` 是生成物，经 `scripts/install.sh` 以符号链接装入
+`${DSH_HOME}/.agent-presets/engineering/`。本次改动**只在新建会话生效**，
+当前会话看不到——与本仓库既有结论一致。
