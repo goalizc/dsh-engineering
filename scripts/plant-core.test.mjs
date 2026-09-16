@@ -1,10 +1,11 @@
 // scripts/plant-core.test.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, mkdir, readFile } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { hashFile, walkFiles, buildManifestMap, plant, PRESET_ID } from './plant-core.mjs';
+import { fileURLToPath } from 'node:url';
+import { hashFile, walkFiles, buildManifestMap, plant, PRESET_ID, MANIFEST_EXCLUDES } from './plant-core.mjs';
 
 test('PRESET_ID is the documented preset id', () => {
   assert.equal(PRESET_ID, 'engineering');
@@ -109,10 +110,64 @@ test('plant link policy creates real dir + per-entry symlinks, no manifest link'
   const destRoot = await mkdtemp(join(tmpdir(), 'plant-link-'));
   const r = await plant({ source: src, destRoot, policy: 'link' });
   assert.equal(r.action, 'planted');
+  assert.equal(r.manifestSource, 'n/a');
   const dest = join(destRoot, PRESET_ID);
   const { lstat, readlink } = await import('node:fs/promises');
   const st = await lstat(join(dest, 'bootstrap.md'));
   assert.ok(st.isSymbolicLink());
   assert.equal(await readlink(join(dest, 'bootstrap.md')), join(src, 'bootstrap.md'));
   await assert.rejects(readFile(join(dest, '.manifest.json')));
+});
+
+// A git checkout has no preset/.manifest.json: the file is gitignored and only
+// enters the npm tarball because package.json#files lists it explicitly. The
+// copy policy used to hard-require it, so `dsh plugin add github:...` installed
+// the package and then planted nothing, silently.
+async function sourceWithoutManifest() {
+  const d = await fixture();
+  await rm(join(d, '.manifest.json'));
+  return d;
+}
+
+test('plant computes the manifest when the source has none (git checkout)', async () => {
+  const src = await sourceWithoutManifest();
+  const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
+  const r = await plant({ source: src, destRoot, policy: 'copy' });
+  assert.equal(r.action, 'planted');
+  assert.equal(r.manifestSource, 'computed');
+  assert.equal(await readFile(join(destRoot, PRESET_ID, 'bootstrap.md'), 'utf8'), 'hello');
+  const inst = JSON.parse(await readFile(join(destRoot, PRESET_ID, '.installed.json'), 'utf8'));
+  assert.deepEqual(Object.keys(inst.files), ['bootstrap.md', 'skills/SKILL.md']);
+  for (const rel of Object.keys(inst.files)) {
+    assert.equal(inst.files[rel], await hashFile(join(src, rel)));
+  }
+});
+
+// The fallback must equal the generated manifest key for key, or the same tree
+// plants different file sets depending on how it was installed. `npm test`'s
+// pretest regenerates preset/.manifest.json, so this compares live values.
+test('MANIFEST_EXCLUDES reproduces the shipped manifest exactly', async () => {
+  const preset = fileURLToPath(new URL('../preset', import.meta.url));
+  const shipped = JSON.parse(await readFile(join(preset, '.manifest.json'), 'utf8'));
+  const computed = await buildManifestMap(preset, { exclude: MANIFEST_EXCLUDES });
+  assert.deepEqual(computed, shipped.files);
+});
+
+test('an explicit manifest wins over the file', async () => {
+  const src = await sourceWithManifest();
+  const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
+  const only = { 'bootstrap.md': await hashFile(join(src, 'bootstrap.md')) };
+  const r = await plant({ source: src, destRoot, policy: 'copy', manifest: only });
+  assert.equal(r.manifestSource, 'provided');
+  const inst = JSON.parse(await readFile(join(destRoot, PRESET_ID, '.installed.json'), 'utf8'));
+  assert.deepEqual(Object.keys(inst.files), ['bootstrap.md']);
+});
+
+// Only ENOENT justifies recomputing: a corrupt manifest is a real fault and
+// must surface, not get papered over by hashing the tree.
+test('a corrupt manifest still throws instead of silently recomputing', async () => {
+  const src = await sourceWithManifest();
+  const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
+  await writeFile(join(src, '.manifest.json'), '{ not json');
+  await assert.rejects(plant({ source: src, destRoot, policy: 'copy' }));
 });

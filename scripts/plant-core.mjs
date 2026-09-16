@@ -46,7 +46,36 @@ async function copyAtomic(src, dst) {
 /** The preset id this bundle installs under. Single source of truth. */
 export const PRESET_ID = 'engineering';
 
-export async function plant({ source, destRoot, name = PRESET_ID, policy = 'copy' }) {
+/**
+ * The exclude set shared by the generated manifest and the runtime fallback.
+ * Both must exclude exactly these, or the same tree plants different file sets
+ * depending on whether preset/.manifest.json happened to ship with it.
+ */
+export const MANIFEST_EXCLUDES = ['.manifest.json', 'node_modules'];
+
+/**
+ * Resolve the file map to plant, from the most explicit source available.
+ *
+ * A git checkout has no preset/.manifest.json: the file is gitignored and only
+ * enters the npm tarball because package.json#files lists it explicitly. So the
+ * absence of that file is expected, not an error — but only ENOENT is: a
+ * corrupt or unreadable manifest is a real fault and must surface.
+ */
+async function resolveManifest({ source, manifest }) {
+  if (manifest) return { files: manifest, manifestSource: 'provided' };
+  try {
+    const parsed = JSON.parse(await readFile(join(source, '.manifest.json'), 'utf8'));
+    return { files: parsed.files, manifestSource: 'file' };
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+    return {
+      files: await buildManifestMap(source, { exclude: MANIFEST_EXCLUDES }),
+      manifestSource: 'computed',
+    };
+  }
+}
+
+export async function plant({ source, destRoot, name = PRESET_ID, policy = 'copy', manifest } = {}) {
   const destDir = join(destRoot, name);
   const installedPath = join(destDir, '.installed.json');
   let installed = null;
@@ -61,10 +90,12 @@ export async function plant({ source, destRoot, name = PRESET_ID, policy = 'copy
       if (ent.name === '.manifest.json') continue;
       await symlink(join(source, ent.name), join(destDir, ent.name));
     }
-    return { action: 'planted', changed: 0, kept: 0, reason: null };
+    return { action: 'planted', changed: 0, kept: 0, reason: null, manifestSource: 'n/a' };
   }
 
-  const manifest = JSON.parse(await readFile(join(source, '.manifest.json'), 'utf8')).files;
+  // NOTE: `manifestFiles`, not `manifest` — a top-level `const manifest` in the
+  // function body would collide with the parameter of the same name.
+  const { files: manifestFiles, manifestSource } = await resolveManifest({ source, manifest });
 
   if (!installed) {
     let hadNonEmpty = false;
@@ -73,13 +104,13 @@ export async function plant({ source, destRoot, name = PRESET_ID, policy = 'copy
   }
 
   await mkdir(destDir, { recursive: true });
-  const newFiles = Object.keys(manifest);
+  const newFiles = Object.keys(manifestFiles);
   const next = {};
   let changed = 0, kept = 0;
 
   for (const rel of newFiles) {
     const dst = join(destDir, rel);
-    const newSha = manifest[rel];
+    const newSha = manifestFiles[rel];
     if (!existsSync(dst)) {
       await copyAtomic(join(source, rel), dst);
       next[rel] = newSha; changed++;
@@ -95,11 +126,11 @@ export async function plant({ source, destRoot, name = PRESET_ID, policy = 'copy
   const record = { name, installedAt: new Date().toISOString(), files: next };
   if (!installed) {
     await writeFileAtomic(installedPath, JSON.stringify(record, null, 2));
-    return { action: 'planted', changed, kept, reason: null };
+    return { action: 'planted', changed, kept, reason: null, manifestSource };
   }
   const action = (kept === 0 && changed === 0) ? 'unchanged' : (kept > 0 ? 'partial' : 'updated');
   await writeFileAtomic(installedPath, JSON.stringify(record, null, 2));
-  return { action, changed, kept, reason: null };
+  return { action, changed, kept, reason: null, manifestSource };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
