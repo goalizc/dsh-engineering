@@ -1,4 +1,4 @@
 # cordis.patch.yml
 - insert:
     - id: engineering-installer
-      name: '@dsh-engineering/dsh-engineering'
+      name: '@goalizc/dsh-engineering'
