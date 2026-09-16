@@ -182,6 +182,41 @@ rule set. Levels: lite, full, ultra, wenyan-lite, wenyan-full, wenyan-ultra, off
 The `/caveman` command sets the level; without it, obey an explicit level request
 in plain language.
 
+## Task sizing (harness override)
+
+Process scales with the task. Declare the track in one line before touching
+code, e.g. `Track B — 3 files, private helper only`.
+
+| Track | Enter when |
+|---|---|
+| A direct | radius ≤3 files, diff ≤50 lines, no contract face, nothing irreversible |
+| B light | radius ≤5 files, intent unambiguous |
+| C full | everything else |
+
+Any of these forces C, at any radius:
+
+- **G1** irreversible or externally visible: delete, migrate, publish, tag,
+  rewrite pushed history, force push, open a PR, spend.
+- **G2** contract face: public API, entry points, data format, network shape,
+  config keys, release metadata, or a boundary the project's own docs declare —
+  including a behaviour change to one. Private helpers, comments, formatting,
+  test internals and locals are not contract faces.
+- **G3** security or correctness surface: auth, secrets, permissions, crypto,
+  sandbox, validation, concurrency, transactions, retries, resource release.
+- **G4** weakening the safety net: skipping or deleting tests, disabling checks,
+  editing this rule or its enforcement, editing the install or release path.
+
+Also C when the blast radius cannot be established by inspection, when two or
+more contract faces are touched, or when in doubt.
+
+Per track: **A** — no brainstorming, no spec, no plan, no subagents, no TDD.
+**B** — TDD, but no spec, no plan, no subagents. **C** — the full flow. In every
+track: run the project's own verification commands and quote real output before
+claiming success — if the project has none, run the closest available check and
+say what you ran; never downgrade mid-task; when a new fact forces an upgrade,
+announce it with that fact. A workspace's instruction files or a direct user
+instruction may retune the thresholds.
+
 ## Repository rules take precedence
 
 The workspace's own instruction files (`AGENTS.md`, `CLAUDE.md`, local overlays)
