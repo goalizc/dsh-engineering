@@ -60,3 +60,21 @@ test('bootstrap.md carries the three tracks and the four hard gates', async () =
     );
   }
 });
+
+// The load-bearing sentence. Without it this section is one more opinion next
+// to an unconditional vendored rule, and the vendored text wins by being
+// closer to the decision. The test names both upstream things it overrides so
+// a future reword cannot quietly soften it into a suggestion.
+test('the injected section overrides the vendored Red Flags decision', async () => {
+  const bootstrap = await read('../preset/bootstrap.md');
+  const section = sectionOf(bootstrap);
+  assert.ok(
+    section.includes('overrides the "1% chance" rule') &&
+      section.includes('"The skill is overkill" Red'),
+    'the "Task sizing" section must name what it overrides — the "1% chance" ' +
+      'rule and the "The skill is overkill" Red Flags row. Without that ' +
+      'sentence the unconditional vendored text still wins and the tracks are ' +
+      'a suggestion. Edit the FOOTER here-doc in scripts/build-bootstrap.sh ' +
+      'and re-run it.',
+  );
+});

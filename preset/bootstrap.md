@@ -184,6 +184,9 @@ in plain language.
 
 ## Task sizing (harness override)
 
+This section overrides the "1% chance" rule, the "The skill is overkill" Red
+Flags row, and every skill description that reads as unconditional.
+
 Process scales with the task. Declare the track in one line before touching
 code, e.g. `Track B — 3 files, private helper only`.
 
