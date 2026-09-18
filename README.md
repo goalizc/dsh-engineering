@@ -208,7 +208,7 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 37 pass / 0 fail
+npm test          # 38 pass / 0 fail
 ```
 
 这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（7 个文件：植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫、输出语言守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
