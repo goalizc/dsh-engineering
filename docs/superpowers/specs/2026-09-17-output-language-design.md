@@ -62,7 +62,8 @@
 |---|---|
 | `preset/plugins/output-language/index.js` | 插件本体；导出 `name`、`apply`、纯函数 `renderLanguageContext(tag)`、`resolveLanguageTag(ctx)` |
 | `preset/plugins/output-language/package.json` | 与 `preset/plugins/bootstrap/package.json` 同构：`name: dsh-output-language`、`private: true`、`type: module`、`main: index.js`、`peerDependencies: {"@deepseek-ai/cordis": "^4.0.2"}` |
-| `scripts/output-language.test.mjs` | 守卫测试（见 §9） |
+| `preset/plugins/output-language/output-language.test.mjs` | 插件自测（无框架 plain-assert：渲染四态、非法输入、读取不抛、注册形状、自包含扫描）。`scripts/install.sh` 的安装门禁要求每个插件目录带同名自测，缺则中止安装——这不是可选项 |
+| `scripts/output-language.test.mjs` | preset 层守卫：组合挂载行 + 插件导出面（见 §9） |
 | `preset/agent.cordis.yml` | 增一行 preset 相对行，紧邻现有 `bootstrap` 行 |
 
 插件 `apply(ctx)` 形态：
@@ -130,16 +131,24 @@ Keep code, identifiers, commands, file paths, and error text verbatim: never tra
 | `renderLanguageContext` 内部任何异常 | 返回"未设置"分支文本；**绝不向上抛**（提示词组装不能被插件打断） |
 | 文本为空 | 不可能：四个分支都返回非空串（测试断言） |
 
-**探针任务**：实施计划的第一个任务是起一个真会话确认 `settings` 是否可从 preset realm 解析。若不能，则该任务内把 `resolveLanguageTag` 的数据源换成读 `$DSH_HOME/settings.yaml`（`dsh-settings-file` 的文档路径，hot-reload 由 chokidar 负责），其余设计不变；换源后必须重跑 §9 的全部断言与实测。
+**探针任务**：实施计划在挂载组合行之后立即起一个真会话，确认 `settings` 是否可从 preset realm 解析（由模型逐字贴出那条 `Interface language:` 行，不以推断代替取证）。若不能，则同一计划内的降级任务把 `resolveLanguageTag` 的数据源换成读 `$DSH_HOME/settings.yaml`（`dsh-settings-file` 的文档路径，hot-reload 由 chokidar 负责），其余设计不变；换源后必须重跑 §9 的全部断言与实测。
 
 ## 9. 测试与验证
 
-**单测** `scripts/output-language.test.mjs`（`node:test`，对齐 `scripts/task-sizing.test.mjs` 的"断言声明式事实"惯例）：
+**单测分两处**（都在 `npm test` 的 glob 内）：
+
+`preset/plugins/output-language/output-language.test.mjs` —— 插件自测（无框架 plain-assert，可 standalone 跑；安装门禁要求）：
 
 1. `renderLanguageContext` 四态：`'zh'`、`'en'`、`undefined`、`'ja'` —— 断言目标语言子句、**跟随用户**句、**术语不翻译**句各就各位；四态返回值均非空。
 2. 非法输入（`''`、`'中文'`、`'zh_CN'`、`123`、`null`）→ 与 `undefined` 同文本。
-3. `preset/agent.cordis.yml` 含 `./plugins/output-language/index.js` 挂载行（掉行即 fail）。
-4. 插件可 `import` 且导出 `apply`/`name`/`renderLanguageContext`；源码**不含 `@deepseek-ai/` import**（守住 §2 约束 2）。
+3. `resolveLanguageTag` 在无 ctx / 无服务 / 服务抛错 / 服务值非法时都返回 `undefined`，不抛。
+4. `apply` 只 `inject(['systemPrompt'])` 并注册**恰好一条** `name: 'output-language'`、`order: 105` 的 context，其 `text` 是函数且渲染当时的设置值。
+5. 插件源码**不含 `@deepseek-ai/` import**（守住 §2 约束 2）。
+
+`scripts/output-language.test.mjs` —— preset 层守卫（`node:test`，对齐 `scripts/task-sizing.test.mjs` 惯例）：
+
+6. `preset/agent.cordis.yml` 含 `./plugins/output-language/index.js` 挂载行（掉行即 fail）。
+7. 插件模块可 `import` 且导出 `name`/`apply`/`renderLanguageContext`/`resolveLanguageTag`。
 
 **命令与证据**：`cd /home/goalizc/dsh-engineering && npm test`（`pretest` 会重建 `preset/.manifest.json`），贴真实输出；另跑 `node scripts/verify-composition.mjs`（第 2a 层组合健康检查，preset 相对行指向的文件缺失会被判 `broken`），贴真实输出。
 
