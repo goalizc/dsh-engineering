@@ -87,20 +87,42 @@ ctx.inject(['systemPrompt'], (scope) => {
 
 ## 6. 渲染规则（决策完备）
 
-模板 = 前导语言子句 + 固定尾句。固定尾句恒定，只有前导子句随 tag 变：
+模板 = 前置规则句 + 界面语言子句 + 覆盖句 + 固定尾句。**规则句恒定且居首**，只有界面语言子句随 tag 变。
 
-固定尾句（逐字）：
+规则句（逐字，四态皆同）：
+
+```
+Output-language rule: write in the language of the user's message.
+```
+
+界面语言子句（逐字，随 `preference` 变）：
+
+| `preference` | 界面语言子句（逐字） |
+|---|---|
+| `zh` | `Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue.` |
+| `en` | `Interface language: en (English) — use English only when the user's message gives no language cue.` |
+| 其他合法 tag（如 `ja`） | `Interface language: ja — use ja only when the user's message gives no language cue.` |
+| 读不到 / 非法 | `Interface language: not set — never assume one; switch whenever the user switches language.` |
+
+覆盖句（逐字，四态皆同）：
+
+```
+Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items.
+```
+
+固定尾句（逐字，四态皆同）：
 
 ```
 Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 ```
 
-| `preference` | 前导语言子句（逐字） |
-|---|---|
-| `zh` | `Interface language: zh (Chinese). Write your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items — in Chinese. If the user writes in another language, answer that message in the user's language instead.` |
-| `en` | `Interface language: en (English). Write your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items — in English. If the user writes in another language, answer that message in the user's language instead.` |
-| 其他合法 tag（如 `ja`） | `Interface language: ja. Write your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items — in ja. If the user writes in another language, answer that message in the user's language instead.` |
-| 读不到 / 非法 | `Interface language: not set. Write your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items — in the language of the user's message, and switch whenever the user switches language.` |
+四态逐字全行（示例 `zh`）：
+
+```
+Output-language rule: write in the language of the user's message. Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue. Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+```
+
+**为什么改成规则前置（实测失败驱动）**：真会话实测，界面 `zh`、用户发**纯英文**消息（`Summarize in one sentence what the README says this preset bundles.`），模型用中文作答，而那条 `Interface language: zh (Chinese).` 行确实在提示词里、且携带了"用户换语言则跟随用户"的例外句。诊断：旧文本把**界面语言命令放在首位**，跟随用户的例外句排在后面，模型执行了前面那条命令、忽略了后面的例外。Owner 决策：**规则前置**——"按用户消息的语言作答"领起，界面语言降级为"消息没有语言线索时"的兜底。自测同步加了顺序守卫（`output-language.test.mjs` 第 4b 组）：断言 `language of the user's message` 的位置**先于** `Interface language:`，四个状态（`zh`/`en`/`ja`/未设置）逐一检查；该守卫在改写前必然失败，是这条缺陷的回归网。
 
 - tag 合法性沿用 DSH 的 BCP 47 风格形状（`/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/`），但**在本仓库内重新声明**，不 import harness。
 - 未知 tag **不猜**语言名，直接把它当作目标语言标签写进句子（用户以后在设置里加语言时无需改插件）。
@@ -139,7 +161,7 @@ Keep code, identifiers, commands, file paths, and error text verbatim: never tra
 
 `preset/plugins/output-language/output-language.test.mjs` —— 插件自测（无框架 plain-assert，可 standalone 跑；安装门禁要求）：
 
-1. `renderLanguageContext` 四态：`'zh'`、`'en'`、`undefined`、`'ja'` —— 断言目标语言子句、**跟随用户**句、**术语不翻译**句各就各位；四态返回值均非空。
+1. `renderLanguageContext` 四态：`'zh'`、`'en'`、`'ja'`、`undefined` —— 各断言**整行逐字全等**（不靠前缀/`includes`）；另有一组**顺序守卫**：断言 `language of the user's message` 的位置先于 `Interface language:`，四态逐一检查（规则前置的回归网，见 §6）。四态返回值均非空。
 2. 非法输入（`''`、`'中文'`、`'zh_CN'`、`123`、`null`）→ 与 `undefined` 同文本。
 3. `resolveLanguageTag` 在无 ctx / 无服务 / 服务抛错 / 服务值非法时都返回 `undefined`，不抛。
 4. `apply` 只 `inject(['systemPrompt'])` 并注册**恰好一条** `name: 'output-language'`、`order: 105` 的 context，其 `text` 是函数且渲染当时的设置值。

@@ -5,7 +5,8 @@
  * (`locale.preference`, registered by the harness's own locale row) and nothing
  * on the prompt side reads it. This plugin turns it into one dynamic
  * system-prompt context line, so replies and workflow artifacts follow the
- * interface language.
+ * user's language, with the interface language as the fallback for a message
+ * that gives no language cue.
  *
  * Three properties this plugin keeps:
  *
@@ -39,9 +40,16 @@ const CONTEXT_ORDER = 105
 const VERBATIM_CLAUSE =
   'Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.'
 
-/** What the rule covers, as one shared phrase so the branches cannot drift. */
-const COVERED =
-  'your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items —'
+/** The rule that leads every branch: the user's own language wins outright. */
+const RULE_SENTENCE = "Output-language rule: write in the language of the user's message."
+
+/** What the rule covers; a separate sentence so the branches cannot drift. */
+const COVERAGE_SENTENCE =
+  'Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items.'
+
+/** The interface language as a fallback, for a message that gives no language cue. */
+const UNSET_CLAUSE =
+  'Interface language: not set — never assume one; switch whenever the user switches language.'
 
 /** Language names we can name confidently; every other tag speaks for itself. */
 const LANGUAGE_NAMES = { zh: 'Chinese', en: 'English' }
@@ -64,8 +72,13 @@ function isValidTag(value) {
 /**
  * Render the language rule for one interface-language tag.
  *
+ * Rule-first by design: the follow-the-user rule leads, and the interface
+ * language is stated only as the fallback for a message without a language cue.
+ * A leading interface-language command would be executed literally and the
+ * exception ignored.
+ *
  * Pure and total: an absent or malformed tag renders the "not set" branch, which
- * delegates to the user's own language. Never returns an empty string — an empty
+ * never assumes an interface language. Never returns an empty string — an empty
  * contribution would drop the line and leave the model unconstrained.
  *
  * @param tag - the `locale.preference` value, or undefined when unreadable.
@@ -73,12 +86,13 @@ function isValidTag(value) {
  */
 function renderLanguageContext(tag) {
   if (!isValidTag(tag)) {
-    return `Interface language: not set. Write ${COVERED} in the language of the user's message, and switch whenever the user switches language. ${VERBATIM_CLAUSE}`
+    return `${RULE_SENTENCE} ${UNSET_CLAUSE} ${COVERAGE_SENTENCE} ${VERBATIM_CLAUSE}`
   }
   const named = LANGUAGE_NAMES[tag.toLowerCase()]
   const label = named === undefined ? tag : `${tag} (${named})`
   const target = named ?? tag
-  return `Interface language: ${label}. Write ${COVERED} in ${target}. If the user writes in another language, answer that message in the user's language instead. ${VERBATIM_CLAUSE}`
+  const clause = `Interface language: ${label} — use ${target} only when the user's message gives no language cue.`
+  return `${RULE_SENTENCE} ${clause} ${COVERAGE_SENTENCE} ${VERBATIM_CLAUSE}`
 }
 
 /**
