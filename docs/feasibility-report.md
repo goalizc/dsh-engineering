@@ -524,7 +524,7 @@ Superpowers 仓库欢迎新宿主移植（有完整流程、PR 模板与评测�
 | 各宿主集成参考 | 同上 Appendix A（行 781+）；`hooks/session-start`；`.opencode/`；`.pi/extensions/superpowers.ts`；`gemini-extension.json` + `GEMINI.md` |
 | bootstrap 本体 | `$UPSTREAM/skills/using-superpowers/SKILL.md`（3,063 字节） |
 | 技能清单与体量 | `$UPSTREAM/skills/`（436 KB / 48 文件；14 份 `SKILL.md` 合计 125,392 字节） |
-| 流程主链 | `README.md`（行 188–204）；`skills/subagent-driven-development/SKILL.md`（行 1–130） |
+| 流程主链 | `README.md`（「验证」一节，自「四步，从便宜到昂贵：第 1 层与**第 2a 层在本仓库可直接跑**」起）；`skills/subagent-driven-development/SKILL.md`（行 1–130） |
 | DSH preset 先例（自带技能 + 自带人格 + 自带插件） | `/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-agent-presets/presets/cordis/agent.cordis.yml`（persona 行 20–40；skill-filesystem/tool-skill 行尾段） |
 | DSH 标准模式全量行清单 | `…/presets/standard/agent.cordis.yml`（255 行） |
 | 模式显示名先例 | `…/presets/standard/preset.yml`（`name: 标准模式`）、`ptc/preset.yml`（`name: PTC 模式`）、`cordis/preset.yml`（`name: 创造模式`） |

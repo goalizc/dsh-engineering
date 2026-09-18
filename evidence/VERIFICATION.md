@@ -213,7 +213,7 @@ $ npm test
 
 ```
 $ bash scripts/build-bootstrap.sh
-built /home/goalizc/dsh-engineering/preset/bootstrap.md (11729 bytes, 230 lines)
+built $REPO/preset/bootstrap.md (11729 bytes, 230 lines)
 $ git diff --exit-code preset/bootstrap.md; echo "drift exit=$?"
 drift exit=0
 ```
@@ -238,7 +238,7 @@ drift exit=0
 
 ```
 $ node scripts/verify-composition.mjs
-  roster       : [{"id":"engineering","name":"工程模式","order":5,"broken":null,"path":"/home/goalizc/.dsh/.agent-presets/engineering/agent.cordis.yml"}]
+  roster       : [{"id":"engineering","name":"工程模式","order":5,"broken":null,"path":"$DSH_HOME/.agent-presets/engineering/agent.cordis.yml"}]
 
 2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves. Mounting, row configs, realms and the skills catalog are layer 2b.
 ```
@@ -334,7 +334,7 @@ engineering: preset planted (65 changed)
 
 ```
 $ bash scripts/build-bootstrap.sh
-built /home/goalizc/dsh-engineering/preset/bootstrap.md (11729 bytes, 230 lines)
+built $REPO/preset/bootstrap.md (11729 bytes, 230 lines)
 $ git diff --exit-code preset/bootstrap.md; echo "drift exit=$?"
 drift exit=0
 $ node scripts/verify-composition.mjs
