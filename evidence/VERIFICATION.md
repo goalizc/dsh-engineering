@@ -371,8 +371,7 @@ spec §8.4 预期 29 例；实施时在 `scripts/index.test.mjs` 额外加了 4 
 `scripts/output-language.test.mjs`。能力是让模型的**输出语言跟随界面语言**：读 host 用户设置
 `locale.preference`，每次组装提示词时渲染一条动态运行时上下文行；用户改用自己的语言提问时该条跟随用户。
 
-> 约定同上：`$REPO` 本仓库根、`$DSH_HOME` DSH 配置目录（默认 `~/.dsh`）、`$HOME` 用户家目录。
-> 本机路径已占位符化，技术内容与数字未作任何改动。
+> 路径占位符约定同文件头；本节未用到的变量从略。
 
 ### 环境
 
@@ -413,6 +412,8 @@ composition health (layer 2a, harness discoverPresets)
 
 2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
 ```
+
+> 为可分发，本机路径已占位符化；实测输出的尾句 `Mounting, row configs, realms and the skills catalog are layer 2b.` 已移至下一条「真挂载仍属 2b」的说明；该尾句在本文件既有 2a 小节照贴过一次。
 
 `broken: null` 说明新挂载行 `./plugins/output-language/index.js` 指向的文件存在、组合 YAML 合语法；
 它**不是挂载**（discovery 刻意不 import 插件），真挂载仍属 2b。
@@ -478,8 +479,9 @@ Interface language: zh (Chinese). Write your replies and every workflow artifact
    `destination … exists without .installed.json; refusing to touch`，于是启动日志出现：
 
    ```
-   engineering: preset NOT installed — destination /home/goalizc/.dsh/.agent-presets/engineering exists without .installed.json; refusing to touch Check that the installed package carries preset/.manifest.json, or that its version can compute one when that file is absent from a git checkout.
+   engineering: preset NOT installed — destination $DSH_HOME/.agent-presets/engineering exists without .installed.json; refusing to touch Check that the installed package carries preset/.manifest.json, or that its version can compute one when that file is absent from a git checkout.
    ```
+   （引文为宿主启动日志原文，为可分发，本机路径已占位符化。）
 
    功能上 preset 仍可用（条目是符号链接，仓库改动即时可见），但该警告每次启动都刷，且 bundle 安装器
    此后拒绝植入。**未在本计划范围内修**。
@@ -489,7 +491,7 @@ Interface language: zh (Chinese). Write your replies and every workflow artifact
 6. **计划里两处口径要按实测改正**：(a) 测试计数口径（见 §1）；(b) 「生效边界是新建会话」应改为
    「**`settings` 值改动热生效；插件/组合改动需重启宿主**」。两条已落进计划末尾的「执行后勘误」。
 
-### 未跑过的部分（诚实清单）
+### 未验证（诚实清单）
 
 - 未在 `--copy` 安装模式下验证；未在非 Web profile（如 ACP/IM）验证；未在其他 preset 验证。
 - 未验证重启宿主前**已存在**的会话是否会在重启后拾取新插件代码（本次是重启后新建会话）。
