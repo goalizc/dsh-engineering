@@ -413,7 +413,7 @@ composition health (layer 2a, harness discoverPresets)
 2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
 ```
 
-> 为可分发，本机路径已占位符化；实测输出的尾句 `Mounting, row configs, realms and the skills catalog are layer 2b.` 已移至下一条「真挂载仍属 2b」的说明；该尾句在本文件既有 2a 小节照贴过一次。
+> 引文为实测输出；为可分发，本机路径已占位符化。该尾句 `Mounting, row configs, realms and the skills catalog are layer 2b.` 在本文件既有 2a 小节（`## 2026-09-16 任务分档（按规模缩放流程）复验` → `### 第 2a 层：组合健康`，本文件 `:243`）已逐字照贴，此处从略。
 
 `broken: null` 说明新挂载行 `./plugins/output-language/index.js` 指向的文件存在、组合 YAML 合语法；
 它**不是挂载**（discovery 刻意不 import 插件），真挂载仍属 2b。

@@ -121,7 +121,9 @@ dsh-engineering/
 │   ├── plant-core.test.mjs          # 植入引擎测试
 │   ├── caveman-default-level.test.mjs  # 三个家的默认级别 + 插件级别名 == vendored 技能
 │   ├── bundle-identity.test.mjs     # 守卫：包名 == patch 自指、dsh.bundle.patch 存在、files 齐备
-│   └── vendored-skills.test.mjs     # 白名单 caveman 技能必须在（半同步树不得通过 npm test）
+│   ├── vendored-skills.test.mjs     # 白名单 caveman 技能必须在（半同步树不得通过 npm test）
+│   ├── task-sizing.test.mjs         # 守卫：自撰的 Task sizing 分档节存在且未被污染
+│   └── output-language.test.mjs     # 守卫：组合挂载 output-language 行 + 插件导出面
 ├── docs/                            # 设计与可行性记录（含上游的 skills 撰写约定）
 ├── evidence/VERIFICATION.md         # 历史验证记录
 └── .cache/                          # sync 自管的上游检出（gitignore，可重建）
@@ -204,7 +206,7 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 npm test          # 36 pass / 0 fail
 ```
 
-这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
+这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（7 个文件：植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫、输出语言守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
 
 ```sh
 node preset/plugins/bootstrap/bootstrap.test.mjs
