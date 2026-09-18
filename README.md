@@ -11,7 +11,7 @@
 
 上游技能**逐字复用**，不改写任何技能正文——这是上游移植规则的要求，也让升级同步变成一次目录复制。适配只发生在三处：一份工具映射文件、一段 bootstrap 拼装、两个 preset 本地插件。
 
-## 自动生效的四件事（其中一件刻意"不生效"）
+## 自动生效的五件事（其中一件刻意"不生效"）
 
 | 能力 | 保障方式 |
 |---|---|
@@ -19,6 +19,7 @@
 | Caveman 默认 `full` 与流程产物优先级 | 同上，注入 `bootstrap.md` 的 "Caveman output style" 一节 |
 | Caveman 级别定义 | **技能**保留在 catalog，按需加载 |
 | **任务分档**（按规模缩放流程） | 注入 `bootstrap.md` 的 "Task sizing (harness override)" 一节，覆盖上游的无条件表述 |
+| **输出语言跟随界面语言** | 插件 `preset/plugins/output-language` 注册一条动态运行时上下文行，读 host 设置 `locale.preference`（界面 `zh` 默认中文、`en` 默认英文；用户换语言时跟随用户） |
 
 `Caveman 级别定义` 那行是刻意的，也是这套设计里唯一的不对称：注入**没有**宣告 `caveman` 技能已激活，反而明说 "It is NOT active yet: load it with the `skill` tool"。
 
@@ -41,6 +42,32 @@ Superpowers 全流程不再无条件施加到每个任务。注入文本里有�
 这一节的覆盖对象是 vendored `using-superpowers` 正文里那行 Red Flags（`| "The skill is overkill" | ... | Use it. |`）与 1% 规则 —— 上游正文逐字不改，所以覆盖物必须同为注入文本。守卫在 `scripts/task-sizing.test.mjs`：生成物含三档与四族、注入节零项目专有名词、承重覆盖句点名上游两处、persona 不再自相矛盾。
 
 代价：`preset/bootstrap.md` 每会话常驻多 `1946` 字节（实测差值，见 `evidence/VERIFICATION.md`）。改动**只在新建会话生效** —— bootstrap 是生成物且经符号链接安装。
+
+## 输出语言
+
+模型默认用界面语言作答。语言来自 host 用户设置 `locale.preference`——设置页的语言开关写它，也可以直接改 `$DSH_HOME/settings.yaml`：
+
+| `locale.preference` | 行为 |
+|---|---|
+| `zh` | 默认中文；用户改用别的语言提问时，该条跟随用户 |
+| `en` | 默认英文；同上 |
+| 未设置 / 非法值 | 不猜：跟随用户消息语言 |
+
+注入的这句话把**规则句放在最前**，界面语言只是"这条消息没给出语言线索"时的回退（`locale.preference: zh` 时的完整行）：
+
+```
+Output-language rule: write in the language of the user's message. Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue. Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+```
+
+规则覆盖**回复正文**与**流程产物**（plan、spec、评审意见、TDD 红绿说明、todo）；**代码、标识符、命令、路径、错误原文一律不翻译**。
+
+生效边界（实测，见 `evidence/VERIFICATION.md` 的 2026-09-18 一节）：
+
+- `locale.preference` 的**值**改动**热生效**——同一条会话内 zh → en → zh 三次切换，注入行每次都跟着变，**无需重启**；因为上下文行的 `text` 是 provider，每次组装提示词都重新渲染。
+- **插件 / 组合代码改动需要重启宿主**（`dsh web`）：运行中的 host 进程缓存了 preset 插件模块（Node ESM 模块缓存），**只新建会话不够**。实测：修复后的插件文件在磁盘上已是新文案，新建会话仍渲染旧文案；重启宿主后新建的会话才见新文案。
+- 安装/刷新 preset 后仍需**新建会话**（DSH 会话一旦开始不能切换模式）。
+
+实现落在 `preset/plugins/output-language/index.js`：注册一条 `order: 105` 的 `systemPrompt.context`，`text` 是每次组装都重跑的 provider；插件自包含，失败路径降级为"跟随用户"，绝不打断提示词组装。
 
 ## 级别切换
 
@@ -72,10 +99,14 @@ dsh-engineering/
 │   │   │   ├── index.js
 │   │   │   ├── package.json
 │   │   │   └── bootstrap.test.mjs
-│   │   └── caveman-command/         # /caveman 命令插件
+│   │   ├── caveman-command/         # /caveman 命令插件
+│   │   │   ├── index.js
+│   │   │   ├── package.json
+│   │   │   └── caveman-command.test.mjs
+│   │   └── output-language/         # 输出语言跟随界面语言（动态上下文行）
 │   │       ├── index.js
 │   │       ├── package.json
-│   │       └── caveman-command.test.mjs
+│   │       └── output-language.test.mjs
 │   └── skills/                      # vendored：Superpowers 14 + Caveman 3 = 17 个技能
 ├── scripts/
 │   ├── sync-superpowers-skills.sh   # 自管缓存同步 14 个技能并重打 DSH 指针
@@ -104,7 +135,7 @@ scripts/install.sh                  # 默认：真实目录 + 逐项符号链接
 scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器）
 ```
 
-`install.sh` 末尾遍历 `preset/plugins/*/` 运行**每个**预设本地插件的自测（当前是 `bootstrap` 与 `caveman-command`），任一失败即中止安装并明确报错；某个插件缺少同名 `<name>.test.mjs` 同样直接失败——插件名单不写死，新增插件自动纳入门禁，"新增插件必须带自测"因此是门禁的一部分，避免把坏 preset 静默装到新机器上。
+`install.sh` 末尾遍历 `preset/plugins/*/` 运行**每个**预设本地插件的自测（当前是 `bootstrap`、`caveman-command` 与 `output-language`），任一失败即中止安装并明确报错；某个插件缺少同名 `<name>.test.mjs` 同样直接失败——插件名单不写死，新增插件自动纳入门禁，"新增插件必须带自测"因此是门禁的一部分，避免把坏 preset 静默装到新机器上。
 
 之后**新建**一个会话，在模式选择器里选 `工程模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建——安装完成后继续用旧会话是看不到的。
 
@@ -170,14 +201,15 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 33 pass / 0 fail
+npm test          # 36 pass / 0 fail
 ```
 
-这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫）以及 `preset/plugins/*/*.test.mjs`（两个插件的自测）。两个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
+这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
 
 ```sh
 node preset/plugins/bootstrap/bootstrap.test.mjs
 node preset/plugins/caveman-command/caveman-command.test.mjs
+node preset/plugins/output-language/output-language.test.mjs
 ```
 
 同一层还有一条不需要 harness 的静态检查——**产品名残留**（旧 id 的具体串）与上游署名：

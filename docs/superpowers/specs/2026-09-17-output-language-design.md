@@ -150,7 +150,7 @@ Output-language rule: write in the language of the user's message. Interface lan
 | `locale` namespace 未注册（`get` 返回 `undefined`） | 同上 |
 | `get` 抛错（只读 provider、解析失败等） | try/catch 吞掉，按"读不到"处理 |
 | `preference` 为空串 / 非法 tag | 按"读不到"处理 |
-| `renderLanguageContext` 内部任何异常 | 返回"未设置"分支文本；**绝不向上抛**（提示词组装不能被插件打断） |
+| `renderLanguageContext` 内部任何异常 | **不会发生**：该函数是**纯全函数、没有 try/catch**——它只做 `typeof` 检查、一次正则 `test` 与字面量插值，没有可抛路径，所以"绝不向上抛"是结构性保证，不是靠捕获兜底（服务侧的异常由 `resolveLanguageTag` 的 try/catch 吞掉） |
 | 文本为空 | 不可能：四个分支都返回非空串（测试断言） |
 
 **探针任务**：实施计划在挂载组合行之后立即起一个真会话，确认 `settings` 是否可从 preset realm 解析（由模型逐字贴出那条 `Interface language:` 行，不以推断代替取证）。若不能，则同一计划内的降级任务把 `resolveLanguageTag` 的数据源换成读 `$DSH_HOME/settings.yaml`（`dsh-settings-file` 的文档路径，hot-reload 由 chokidar 负责），其余设计不变；换源后必须重跑 §9 的全部断言与实测。

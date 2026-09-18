@@ -721,6 +721,10 @@ git commit -m "test: 守卫 output-language 组合挂载行与导出面"
 
 在 `evidence/VERIFICATION.md` 末尾追加一节（用既有的 `$REPO` / `$DSH_HOME` 占位符约定，数字与命令照抄实测）：
 
+> **执行后说明（回填）**：下面这段骨架里的 `<...>` 是**原始计划的粘贴位**，已于 Task 5 用实测证据填充，
+> 正文保留原样以存真。**落地成文的那一节**在 `$REPO/evidence/VERIFICATION.md`，标题为
+> 「输出语言跟随界面语言（**2026-09-18**）」（计划里预填的 2026-09-17 是计划撰写日，实际取证日期是 09-18）。
+
 ```markdown
 ## 输出语言跟随界面语言（2026-09-17）
 
@@ -792,7 +796,7 @@ git commit -m "docs: 回填输出语言跟随界面语言的实测与文档"
 | §5 文件表 3 文件 | Task 1、Task 2、Task 4；**新增插件自测**（安装门禁要求）在 Task 1，并已在计划 commit 内回填 spec §5 文件表 |
 | §6 渲染规则四态逐字 | Task 1 Step 1/3 的断言与实现逐字固定 |
 | §7 数据流与时效（每次组装重算、下一轮生效） | Task 1（provider）+ Task 4 场景 2 |
-| §8 失败模式与降级 | Task 1 Step 3（try/catch、warnOnce、非空串）+ Task 3（文件降级、探针流程） |
+| §8 失败模式与降级 | Task 1 Step 3（`resolveLanguageTag` 的 try/catch、warnOnce、非空串；`renderLanguageContext` 本身是纯全函数、无 try/catch——见「执行后勘误」5）+ Task 3（文件降级、探针流程） |
 | §9 单测 + 命令证据 | Task 1、Task 4、Task 5 Step 4 |
 | §9 端到端四场景 | Task 4 Step 3-6 |
 | §10 未验证点（settings 可达性） | Task 2 Step 3-4 探针 + Task 5 Step 2「未跑过的部分」 |
@@ -801,3 +805,31 @@ git commit -m "docs: 回填输出语言跟随界面语言的实测与文档"
 **2. Placeholder scan**：无 TBD/TODO；Task 1/3/4 的代码与命令逐字给出；Task 5 的文档骨架里带 `<...>` 的位置**是留给实测输出的粘贴位**，由 Task 4 的真实证据填充，属"照抄实测"而非"待设计"。
 
 **3. Type consistency**：`renderLanguageContext(tag)`、`resolveLanguageTag(ctx)`、`parseLanguageTag(yamlText)`、`settingsDocumentPath()`、`LANGUAGE_TAG`、`CONTEXT_ORDER`、`name` 在 Task 1/3 的实现、Task 1/3 的断言、Task 4 的导出面断言里同名同型；`isValidTag` 只在 Task 1 定义、Task 3 复用；Task 3 的导出行包含 Task 4 断言用到的全部键。
+
+---
+
+## 执行后勘误（本节为实施回填，非原始计划）
+
+本计划已执行完毕（5 个任务；提交链 `f49a2ed`(插件) → `75ea80e`(挂载) → `edc3c8e`(守卫) →
+`aeb15b6`(规则前置修复)）。执行期与评审期共发现 **5 处需要更正的地方**——正文保留原样以存真，
+此处逐条列明。实测证据（环境、命令输出、会话 id 与模型原文）见 `$REPO/.superpowers/sdd/task-5-evidence.md`
+与 `$REPO/evidence/VERIFICATION.md` 的「输出语言跟随界面语言（2026-09-18）」一节。
+
+| # | 位置（本文件行号） | 原计划写的 | 执行期的正确做法 |
+|---|---|---|---|
+| 1 | `21`、`334`、`536`、`604` | 测试计数按「每个 `*.test.mjs` 文件计 1 个测试」推算（基线 33、Task 1 后 34、终值 36）——终值对，**口径错** | Node v26 的 `node --test` 按**每个 `test()` 调用**计数，**没有 `test()` 的文件各计 1**。基线 33 = 31 个 `test()` + 2 个插件自测文件；Task 1 后 34；Task 4 后 **36** = 33 个 `test()` + 3 个插件自测文件 |
+| 2 | `21` | 「**生效边界是新建会话**」 | 分两种情况：`settings` 的**值**改动**热生效**（同会话 zh→en→zh 三次注入都跟着变，无需重启）；**插件 / 组合代码改动需要重启宿主**（`dsh web`）——运行中的 host 进程缓存了 preset 插件模块（Node ESM 模块缓存），**只新建会话不够** |
+| 3 | Task 4 Step 5/6（约 `629`） | 场景 3 期望「跟随用户 → 英文答复」——计划假定一写就过 | 第一次实测**失败**（界面 zh + 英文提问 → 中文答，会话 `session-ea6960d6…`）。用户拍板**方案 A（规则前置）**：规则句 `Output-language rule: …` 置于行首，界面语言降为「消息无语言线索」时的回退；修复提交 `aeb15b6`，并在插件自测里加**顺序守卫**（旧文案下四态全红 → RED，修复后 GREEN）。重启宿主后复测通过（会话 `session-d6bca65a…`） |
+| 4 | Task 3（整任务） | 「若 `settings` 不可达，则实现读 `$DSH_HOME/settings.yaml` 的文件降级」 | **Task 3 被跳过**：闸门 A 证明 settings 服务在 preset realm **可达**（探针会话 `session-37e7c308…` 注入行原文为 `Interface language: zh (Chinese). …`），降级数据源不实现。该任务本就是条件执行 |
+| 5 | Self-Review「Spec coverage」`795` | 「Task 1 Step 3（try/catch、warnOnce、非空串）」——未区分两个函数 | try/catch 只在 `resolveLanguageTag`；`renderLanguageContext` 是**纯全函数、无 try/catch**（不抛是因为只做 `typeof` / 正则 / 字面量插值）。spec §8 对应行的措辞已按实现改正 |
+
+### 计划未预见的既有仓库缺陷（**明确不属于本计划范围，本次未修**）
+
+`scripts/plant-core.mjs` 的 `link` 分支（84-94 行）mkdir → 清空目标目录（连 `.installed.json` 一起删）
+→ 只建符号链接 → return，**从不写 `.installed.json`**；宿主启动时 bundle 安装器走 copy 分支，命中
+100-104 行守卫 `destination … exists without .installed.json; refusing to touch`，于是每次启动都刷这条警告，
+且 bundle 安装器此后拒绝植入。诱因是本次按 `install.sh` 默认 `link` 策略重装（该路径正是 README 推荐的刷新路径）。
+
+功能上不受影响（条目是符号链接，仓库改动即时可见），但它**预先存在**于 `plant-core.mjs`，与本计划的
+输出语言能力无关；修它属于另一条工作线（植入引擎 / 安装路径），**本计划不修**。完整启动日志原文见
+`$REPO/.superpowers/sdd/task-5-evidence.md` §5 第 4 条。
