@@ -399,7 +399,8 @@ spec §8.4 预期 29 例；实施时在 `scripts/index.test.mjs` 额外加了 4 
 **计数口径**（Task 1/4 实测校正）：Node v26 的 `node --test` 按**每个 `test()` 调用**计数，无
 `test()` 的测试文件（3 个 preset 插件自测）各计 1。基线 33 = 31 个 `test()` + 2 个插件自测文件；
 Task 1 后 34；Task 4 后 **36** = 33 个 `test()`（含 `scripts/output-language.test.mjs` 的 2 条）
-+ 3 个插件自测文件。
++ 3 个插件自测文件。（本轮修复在 `scripts/output-language.test.mjs` 新增 1 条 `test()`——spec §6 冻结文案与
+实现输出的交叉守卫——故当前实测为 **37** = 34 个 `test()` + 3 个插件自测文件；上面的 36 是当时那一轮的实测值。）
 
 ### 2. 组合健康（第 2a 层）
 
@@ -413,7 +414,7 @@ composition health (layer 2a, harness discoverPresets)
 2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
 ```
 
-> 引文为实测输出；为可分发，本机路径已占位符化。该尾句 `Mounting, row configs, realms and the skills catalog are layer 2b.` 在本文件既有 2a 小节（`## 2026-09-16 任务分档（按规模缩放流程）复验` → `### 第 2a 层：组合健康`，本文件 `:243`）已逐字照贴，此处从略。
+> 引文为实测输出；为可分发，本机路径已占位符化。该尾句 `Mounting, row configs, realms and the skills catalog are layer 2b.` 在本文件既有 2a 小节（`## 2026-09-16 任务分档（按规模缩放流程）复验` → `### 第 2a 层：组合健康`）已逐字照贴，此处从略。
 
 `broken: null` 说明新挂载行 `./plugins/output-language/index.js` 指向的文件存在、组合 YAML 合语法；
 它**不是挂载**（discovery 刻意不 import 插件），真挂载仍属 2b。

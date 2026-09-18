@@ -66,6 +66,7 @@ Output-language rule: write in the language of the user's message. Interface lan
 - `locale.preference` 的**值**改动**热生效**——同一条会话内 zh → en → zh 三次切换，注入行每次都跟着变，**无需重启**；因为上下文行的 `text` 是 provider，每次组装提示词都重新渲染。
 - **插件 / 组合代码改动需要重启宿主**（`dsh web`）：运行中的 host 进程缓存了 preset 插件模块（Node ESM 模块缓存），**只新建会话不够**。实测：修复后的插件文件在磁盘上已是新文案，新建会话仍渲染旧文案；重启宿主后新建的会话才见新文案。
 - 安装/刷新 preset 后仍需**新建会话**（DSH 会话一旦开始不能切换模式）。
+- **`settings` 服务不可达时没有可观测信号**：降级静默生效（插件只 `warn` 一次，界面不显示），唯一判据是注入行原文——它会落到 `Interface language: not set — never assume one; switch whenever the user switches language.` 那一支。
 
 实现落在 `preset/plugins/output-language/index.js`：注册一条 `order: 105` 的 `systemPrompt.context`，`text` 是每次组装都重跑的 provider；插件自包含，失败路径降级为"跟随用户"，绝不打断提示词组装。
 
@@ -141,6 +142,10 @@ scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器
 
 之后**新建**一个会话，在模式选择器里选 `工程模式`。会话一旦开始就不能切换模式（DSH 的设计），所以必须新建——安装完成后继续用旧会话是看不到的。
 
+**改动类型决定要不要重启宿主**：preset 本地插件的**代码**改动需要重启宿主（`dsh web`）才生效——运行中的 host 进程缓存了插件模块，**只新建会话不够**；`settings` 的**值**改动是**热生效**的。两点的实测证据见「输出语言」节的生效边界。
+
+**已知缺陷（预先存在，本仓库不修 `scripts/plant-core.mjs`）**：按默认 `link` 策略装完后，宿主每次启动都会打印 `engineering: preset NOT installed — destination … exists without .installed.json; refusing to touch`。功能不受影响（条目是符号链接，仓库改动即时生效），但 **bundle 通道此后拒绝植入**。
+
 ### 通过 `dsh plugin add` 安装（bundle 通道）
 
 ```sh
@@ -203,7 +208,7 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 36 pass / 0 fail
+npm test          # 37 pass / 0 fail
 ```
 
 这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（7 个文件：植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫、输出语言守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：

@@ -21,7 +21,7 @@
 - **生效边界是新建会话**：preset 组合在会话启动时定死，装完必须**新建**一个会话才看得到；当前会话不受影响。
 - **提交约定**：Conventional Commits + 中文主题；一个子系统一个 commit；不 `push`。
 - **验证证据必须真实**：粘贴实测输出与从会话日志里取到的模型原文，禁止编造；跑不到的场景要如实写"未跑"。
-- **测试终值**：`npm test` → `tests 36`、`pass 36`、`fail 0`。口径（Task 1 实测校正）：`node --test` 把**每个** `*.test.mjs` 文件计为 1 个测试，基线 33 已含 `bootstrap.test.mjs` 与 `caveman-command.test.mjs` 各 1 个；Task 1 新增插件自测 +1 → **34**；Task 4 新增 `scripts/output-language.test.mjs` 的 2 个子测试 +2 → **36**。实测若与 36 不同，以实测为准并回填 README。
+- **测试终值**：`npm test` → `tests 36`、`pass 36`、`fail 0`。口径（Task 1 实测校正）：`node --test` 把**每个** `*.test.mjs` 文件计为 1 个测试，基线 33 已含 `bootstrap.test.mjs` 与 `caveman-command.test.mjs` 各 1 个；Task 1 新增插件自测 +1 → **34**；Task 4 新增 `scripts/output-language.test.mjs` 的 2 个子测试 +2 → **36**。实测若与 36 不同，以实测为准并回填 README。（口径已按实测更正，见文末「执行后勘误」1）
 
 ## File Structure
 
