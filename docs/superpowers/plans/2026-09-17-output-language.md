@@ -21,7 +21,7 @@
 - **生效边界是新建会话**：preset 组合在会话启动时定死，装完必须**新建**一个会话才看得到；当前会话不受影响。
 - **提交约定**：Conventional Commits + 中文主题；一个子系统一个 commit；不 `push`。
 - **验证证据必须真实**：粘贴实测输出与从会话日志里取到的模型原文，禁止编造；跑不到的场景要如实写"未跑"。
-- **测试终值**：`npm test` → `tests 35`、`pass 35`、`fail 0`（基线 33 + 新增 `scripts/output-language.test.mjs` 的 2 个子测试；插件自测是无框架 plain-assert 文件，不计入子测试数，与 `bootstrap.test.mjs` 同例）。实测若与 35 不同，以实测为准并回填 README。
+- **测试终值**：`npm test` → `tests 36`、`pass 36`、`fail 0`。口径（Task 1 实测校正）：`node --test` 把**每个** `*.test.mjs` 文件计为 1 个测试，基线 33 已含 `bootstrap.test.mjs` 与 `caveman-command.test.mjs` 各 1 个；Task 1 新增插件自测 +1 → **34**；Task 4 新增 `scripts/output-language.test.mjs` 的 2 个子测试 +2 → **36**。实测若与 36 不同，以实测为准并回填 README。
 
 ## File Structure
 
@@ -334,7 +334,7 @@ Expected: PASS — 末行打印 `selftest OK: output-language`
 - [ ] **Step 5: 跑全仓测试，确认没有回归**
 
 Run: `npm test`
-Expected: `tests 33`、`pass 33`、`fail 0`（此刻还没有 scripts 层新测试）
+Expected: `tests 34`、`pass 34`、`fail 0`（基线 33 + 本任务新增的插件自测文件 1 个）
 
 - [ ] **Step 6: 提交**
 
@@ -536,7 +536,7 @@ export {
 - [ ] **Step 4: 跑自测与全仓测试**
 
 Run: `node preset/plugins/output-language/output-language.test.mjs && npm test`
-Expected: 自测 PASS；`npm test` → `tests 33`、`pass 33`、`fail 0`
+Expected: 自测 PASS；`npm test` → `tests 34`、`pass 34`、`fail 0`
 
 - [ ] **Step 5: 重跑探针（同 Task 2 Step 3/4 的会话流程）**
 
@@ -604,7 +604,7 @@ test('the plugin module exports the surface the composition row needs', async ()
 - [ ] **Step 2: 跑全仓测试，确认新终值**
 
 Run: `npm test`
-Expected: `tests 35`、`pass 35`、`fail 0`
+Expected: `tests 36`、`pass 36`、`fail 0`（34 + 本文件 2 个子测试）
 
 - [ ] **Step 3: 场景 1 —— 界面 zh 的默认语言**
 
@@ -715,7 +715,7 @@ git commit -m "test: 守卫 output-language 组合挂载行与导出面"
 实现落在 `preset/plugins/output-language/index.js`：注册一条 `order: 105` 的 `systemPrompt.context`，`text` 是每次组装都重跑的 provider；插件自包含，失败路径降级为"跟随用户"，绝不打断提示词组装。
 ```
 
-4. `## 验证` 一节里 `npm test          # 33 pass / 0 fail` 改为实测值（预期 `# 35 pass / 0 fail`）。
+4. `## 验证` 一节里 `npm test          # 33 pass / 0 fail` 改为实测值（预期 `# 36 pass / 0 fail`）。
 
 - [ ] **Step 2: 回填验证记录**
 
@@ -770,7 +770,7 @@ node scripts/verify-composition.mjs
 git status --short
 ```
 
-Expected: `npm test` → `tests 35`、`pass 35`、`fail 0`；`verify-composition.mjs` → `MOUNT OK`；`git status --short` 只列出本次要提交的三个文档文件。
+Expected: `npm test` → `tests 36`、`pass 36`、`fail 0`；`verify-composition.mjs` → `MOUNT OK`；`git status --short` 只列出本次要提交的两个文档文件。
 
 - [ ] **Step 4: 提交**
 
