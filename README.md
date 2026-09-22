@@ -19,7 +19,7 @@
 | Caveman 默认 `full` 与流程产物优先级 | 同上，注入 `bootstrap.md` 的 "Caveman output style" 一节 |
 | Caveman 级别定义 | **技能**保留在 catalog，按需加载 |
 | **任务分档**（按规模缩放流程） | 注入 `bootstrap.md` 的 "Task sizing (harness override)" 一节，覆盖上游的无条件表述 |
-| **输出语言跟随界面语言** | 插件 `preset/plugins/output-language` 注册一条动态运行时上下文行，读 host 设置 `locale.preference`（界面 `zh` 默认中文、`en` 默认英文；用户换语言时跟随用户） |
+| **输出语言跟随界面语言** | 插件 `preset/plugins/output-language` 注册一条动态运行时上下文行，读 host 设置 `locale.preference`（界面 `zh` 默认中文、`en` 默认英文；用户换语言时跟随用户；覆盖回复、思考与工具间隙旁白、流程产物） |
 
 `Caveman 级别定义` 那行是刻意的，也是这套设计里唯一的不对称：注入**没有**宣告 `caveman` 技能已激活，反而明说 "It is NOT active yet: load it with the `skill` tool"。
 
@@ -41,7 +41,7 @@ Superpowers 全流程不再无条件施加到每个任务。注入文本里有�
 
 这一节的覆盖对象是 vendored `using-superpowers` 正文里那行 Red Flags（`| "The skill is overkill" | ... | Use it. |`）与 1% 规则 —— 上游正文逐字不改，所以覆盖物必须同为注入文本。守卫在 `scripts/task-sizing.test.mjs`：生成物含三档与四族、注入节零项目专有名词、承重覆盖句点名上游两处、persona 不再自相矛盾。
 
-代价：`preset/bootstrap.md` 每会话常驻多 `1946` 字节（实测差值，见 `evidence/VERIFICATION.md`）。改动**只在新建会话生效** —— bootstrap 是生成物且经符号链接安装。
+代价：`preset/bootstrap.md` **每会话注入一次**，比上一版常驻多 `1946` 字节（实测差值，见 `evidence/VERIFICATION.md`；"每会话一次"由 2026-09-22 的幂等修复保证——此前每个 claim 到输入的 step 都会重注一次）。改动**只在新建会话生效** —— bootstrap 是生成物且经符号链接安装。
 
 ## 输出语言
 
@@ -56,16 +56,17 @@ Superpowers 全流程不再无条件施加到每个任务。注入文本里有�
 注入的这句话把**规则句放在最前**，界面语言只是"这条消息没给出语言线索"时的回退（`locale.preference: zh` 时的完整行）：
 
 ```
-Output-language rule: write in the language of the user's message. Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue. Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language rule: write in the language of the user's message. Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue. Apply this to everything you write: your replies, your reasoning, your progress notes between tool calls, and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 ```
 
-规则覆盖**回复正文**与**流程产物**（plan、spec、评审意见、TDD 红绿说明、todo）；**代码、标识符、命令、路径、错误原文一律不翻译**。
+规则覆盖**回复正文**、**思考流与工具调用之间的进度旁白**、以及**流程产物**（plan、spec、评审意见、TDD 红绿说明、todo）；**代码、标识符、命令、路径、错误原文一律不翻译**。过程覆盖是 2026-09-22 的实测驱动补丁：此前只点名"replies and every workflow artifact"，交付物是中文而思考/轮内旁白是英文（10 轮会话思考中文字符 0.2%、正文 16.2%），详见 `evidence/VERIFICATION.md` 的 2026-09-22 一节。
 
 生效边界（实测，见 `evidence/VERIFICATION.md` 的 2026-09-18 一节）：
 
 - `locale.preference` 的**值**改动**热生效**——同一条会话内 zh → en → zh 三次切换，注入行每次都跟着变，**无需重启**；因为上下文行的 `text` 是 provider，每次组装提示词都重新渲染。
 - **插件 / 组合代码改动需要重启宿主**（`dsh web`）：运行中的 host 进程缓存了 preset 插件模块（Node ESM 模块缓存），**只新建会话不够**。实测：修复后的插件文件在磁盘上已是新文案，新建会话仍渲染旧文案；重启宿主后新建的会话才见新文案。
 - 安装/刷新 preset 后仍需**新建会话**（DSH 会话一旦开始不能切换模式）。
+- **思考语种是提示词级引导，不是保证**：覆盖句已点名 reasoning 与过程旁白，但思考用什么语言最终由模型决定；规则只提高遵从概率。
 - **`settings` 服务不可达时没有可观测信号**：降级静默生效（插件只 `warn` 一次，界面不显示），唯一判据是注入行原文——它会落到 `Interface language: not set — never assume one; switch whenever the user switches language.` 那一支。
 
 实现落在 `preset/plugins/output-language/index.js`：注册一条 `order: 105` 的 `systemPrompt.context`，`text` 是每次组装都重跑的 provider；插件自包含，失败路径降级为"跟随用户"，绝不打断提示词组装。
@@ -231,7 +232,7 @@ git grep -c 'obra/superpowers' -- README.md THIRD-PARTY-NOTICES.md preset/SYNC.m
 
 排除项逐条：`docs/`、`evidence/` 是 spec §5.3 裁定冻结的历史记录（记录的是当时真实跑过的旧名命令），`preset/skills/` 是上游正文，`scripts/sync-superpowers-skills.sh` 的名字取自上游。README 需排除有**两个**原因：升级一节必须写出旧 id 才能给出迁移步骤，且**上面这条 grep 命令自身**就含被检的模式串。
 
-bootstrap 自测断言移植契约的三条性质：首次注入一次、不重复注入、压缩丢掉后重新注入；另外覆盖 user 角色与 plugin 来源标记、被拒绝的步、空步、已有消息的保留顺序。caveman 自测覆盖 7 个级别的解析往返（名字钉死字面量）、注册形状、`/caveman` 裸调用报**当前**级别且不注入、级别的按会话隔离、非法输入报错且不注入。
+bootstrap 自测断言移植契约的三条性质：首次注入一次、不重复注入、压缩丢掉后重新注入。它按**真实的 `agent/pre-step` 载荷形状**驱动（`messages` 只是本步 claim 到的增量，历史另经 `session.deriveMessages()` 建模），因此第 2 组能抓住"按本步消息去重"这个曾经的缺陷：老实现下 5 步会注入 5 次。另外覆盖跨会话各自注入一次、读不到历史时的退化为每会话一次、user 角色与 plugin 来源标记、被拒绝/被中止的步、空步、已有消息的保留顺序、消息身份新鲜与冻结。caveman 自测覆盖 7 个级别的解析往返（名字钉死字面量）、注册形状、`/caveman` 裸调用报**当前**级别且不注入、级别的按会话隔离、非法输入报错且不注入。
 
 **2a. 组合健康（本仓库可跑，需要机器上装了 harness）**
 
@@ -267,8 +268,9 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
 ## 设计要点
 
 - **注入的是 user 角色消息，不是 system 消息**：符合上游 Shape B 纪律，也是 DSH 记录持久上下文的方式（`createUserMessage` + `source: { kind: 'plugin', plugin }`）。
-- **幂等靠内容标记**：注入文本带 `<EXTREMELY_IMPORTANT>`；每次 pre-step 扫描本步将进入的消息，已在场就什么都不做。
-- **压缩后自愈**：DSH 没有压缩事件可订阅，也不需要——压缩把旧历史换成摘要后，标记从"将进入的消息"里消失，下一次 pre-step 自动重新注入。这是"存在性即条件"的设计，比订阅事件更抗变化。
+- **幂等靠内容标记，但判据是"会话历史"，不是本步消息**：注入文本带 `<EXTREMELY_IMPORTANT>`。`agent/pre-step` 拿到的 `messages` 只是本步从 inbox claim 到的**增量**（`ReactLoopInbox.claim`），永远不含已注入的那条，所以插件改问会话自己：`agent.session.deriveMessages()` 里还有没有这个标记。曾经按"本步消息"去重的版本因此每个 claim 到输入的 step 都重注一次——一条 10 轮会话实测注入 11 次、`128282` 字符，另一条 12 轮注入 44 次、`513128` 字符。
+- **压缩后自愈**：压缩的 `replace` 会把被遮蔽的节点从 `deriveMessages()` 的派生历史里删掉，标记随之消失，下一次 pre-step 自动重新注入。不需要订阅压缩事件，也不需要"该步有无输入"之外的额外条件：同一次历史读取同时回答了"在不在上下文里"和"是不是刚被压缩掉"。
+- **失败姿态**：读历史整段 try/catch，读不到（会话对象形状不认识）就退化为"每个会话对象注入一次"——比按步重注好，且不阻断会话。
 - **persona 段保持简短**：只在系统提示里说"你有 superpowers、先查技能、默认 caveman full"，把 9 KB 正文交给一次性注入的消息，避免每轮重复付费。persona 用 `complete: false`（它是必填字段，省略会挂载失败）。
 - **不改技能正文**：唯一例外是官方允许的 Platform Adaptation 指针行（`using-superpowers/SKILL.md` 加一行 `- DeepSeek Harness: references/dsh-tools.md`）。
 - **仓库规则优先**：bootstrap 末尾有专门一节声明工作区的 `AGENTS.md`/`CLAUDE.md` 与直接人类指令高于任何技能——用于压住"每任务自动提交 / 自动 push"这类与具体仓库治理冲突的通用建议。
@@ -284,6 +286,7 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
 | 级别切换依赖本仓库插件 | `/caveman` 是本仓库实现；上游的 slash command 形态在 DSH 不适用，删掉这个插件级别切换即失效 |
 | 裸 `/caveman` 的"当前级别"只在进程内记得 | 级别按会话存在插件的内存里（`invocation.agent.id` 为键），重启/新进程后裸 `/caveman` 回落显示默认 `full`（显示层缺口）。更实质的一条：级别公告是**普通会话历史**，压缩若把它折掉，模型上下文里的级别随之丢失，而重新注入的 bootstrap 会再断言默认 `full` —— 即级别只持久到压缩为止。要彻底闭合需把当前级别一并重新注入，本仓库刻意未做 |
 | 上游同步是手动的 | 没有定时任务也没有 CI：运行两个 sync 脚本，然后 `build-bootstrap.sh` 与 `install.sh` |
+| "选了工程模式"不等于"会话跑在工程模式" | DSH 的新会话页把预设挑选**暂存在客户端**，落到"下一个成为当前会话的空白会话"上（转录里体现为 `agent-preset/selected` 事件）。所以 transcript header 的 `agentPreset` 只是**创建时**的默认值，可被该事件覆盖；判据要看会话头部的模式标签、或转录里的 `agent-preset/selected` 与 bootstrap 标记。实测：235 个会话中 5 个带该事件，其中一条 header 写 `engineering` 的会话实际跑在 `cordis`（创造模式）上——没有 bootstrap 注入，也没有语言规则，表现就是"过程全英文" |
 
 ## 上游与许可
 

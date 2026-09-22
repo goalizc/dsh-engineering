@@ -109,7 +109,7 @@ test('the frozen clauses in spec section 6 still match the rendered output', asy
   );
   const coverage = fencedLine(
     section6,
-    'Apply this to your replies and every workflow artifact[^\\n]*?\\.(?![^\\n]*Keep code)',
+    'Apply this to everything you write[^\\n]*?\\.(?![^\\n]*Keep code)',
   );
   const verbatim = fencedLine(
     section6,

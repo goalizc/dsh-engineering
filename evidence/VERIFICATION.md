@@ -5,7 +5,7 @@
 本文件记录方案 B 落地后**实际跑过**的验证，以及**尚未跑过**的部分。数字与命令都可复现。
 
 > **占位符约定**：为便于公开分发，本文件中的本机路径已占位符化——
-> `$REPO` 本仓库根、`$DSH_HOME` DSH 配置目录（默认 `~/.dsh`）、`$ARDUPLOT_WS` 一个使用本 preset 的工作区示例、`$UPSTREAM` 上游 Superpowers 检出、`$DSH_WEB_URL` DSH Web GUI 地址、`$HOME` 用户家目录。
+> `$REPO` 本仓库根、`$DSH_HOME` DSH 配置目录（默认 `~/.dsh`）、`$ARDUPLOT_WS` 一个使用本 preset 的工作区示例、`$TAKISY_WS` 另一个使用本 preset 的工作区示例、`$UPSTREAM` 上游 Superpowers 检出、`$DSH_WEB_URL` DSH Web GUI 地址、`$HOME` 用户家目录。
 > 技术内容与数字未作任何改动。
 
 ## 环境
@@ -499,3 +499,124 @@ Interface language: zh (Chinese). Write your replies and every workflow artifact
 - 未在 `--copy` 安装模式下验证；未在非 Web profile（如 ACP/IM）验证；未在其他 preset 验证。
 - 未验证重启宿主前**已存在**的会话是否会在重启后拾取新插件代码（本次是重启后新建会话）。
 - 未复现「父会话安装前创建 → 子代理无注入行」之外的其他快照继承场景。
+
+## 2026-09-22 过程语言覆盖扩写 + bootstrap 幂等修复
+
+### 环境
+
+| 项 | 值 |
+|---|---|
+| 日期 | 2026-09-22 22:55 CST |
+| 基线 HEAD | `4f71887`（`docs: 占位符化旧节本机路径，README 行号引用改为稳定锚点`） |
+| Node | v26.8.2 |
+| 触发来源 | `$TAKISY_WS` 会话 `session-b257acda…`（标题「下一阶段工作计划」，预设 `engineering`，10 轮）的过程语言实测 |
+
+两个缺陷同源不同面，一起修：
+
+1. **过程语言**：`output-language` 的覆盖句只点名 replies 与 workflow artifacts，思考流与工具间隙的
+   进度旁白不在管辖范围内 → 交付物中文、过程英文。
+2. **bootstrap 幂等**：`agent/pre-step` 的 `messages` 只是本步从 inbox claim 到的增量
+   （`ReactLoopInbox.claim`，见 `dsh-agent-loop/lib/index.js` 的 `preStep`），而插件拿它去重 →
+   每个 claim 到输入的 step 都重注入一次。
+
+### 1. 第 1 层：`npm test`
+
+```
+ℹ tests 38
+ℹ pass 38
+ℹ fail 0
+```
+
+四条与本次改动直接相关的守卫逐条通过：
+
+```
+✔ the composition mounts the output-language plugin
+✔ the plugin module exports the surface the composition row needs
+✔ the README publishes the zh line verbatim, so the example cannot fork
+✔ the frozen clauses in spec section 6 still match the rendered output
+```
+
+三个插件自测（`install.sh` 的安装门禁同源）：
+
+```
+selftest OK: 10 assertion groups passed   # bootstrap（改前 6 组）
+selftest OK: 8 assertions groups passed   # caveman-command（未改）
+selftest OK: output-language              # output-language（golden 已随文案更新）
+self-tests: 3 plugin(s) OK
+```
+
+### 2. 反向取证：老实现必然转红
+
+`preset/plugins/bootstrap/bootstrap.test.mjs` 第 2 组按**真实的 pre-step 载荷形状**驱动
+（`messages` 只给本步 claim 到的增量，历史经 `session.deriveMessages()` 单独建模）。用
+`git show HEAD:preset/plugins/bootstrap/index.js` 换回老实现，同一份断言直接失败——老实现
+"已注入"的判据来自它拿到的 `messages`，而那批消息里永远没有自己注入过的那条。
+
+同一形状的独立复现脚本（5 个连续 step，每步只 claim 一条用户消息，历史持续累积）：
+
+```
+--- repro OLD ---
+plugins/bootstrap: 5 steps -> 5 bootstrap injection(s), history 5 messages
+--- repro NEW ---
+plugins/bootstrap: 5 steps -> 1 bootstrap injection(s), history 1 messages
+```
+
+### 3. 真实会话侧的实测（缺陷证据，修复前）
+
+`$TAKISY_WS` 会话 `session-b257acda…`（`engineering`、界面 `zh`、用户全程中文、10 轮）：
+
+| 指标 | 实测 |
+|---|---|
+| 思考流中文字符 | `820 / 438896 = 0.2%` |
+| 可见正文中文字符 | `6461 / 39781 = 16.2%` |
+| 轮内第一段话的语言 | 10 轮中 9 轮英文；第 1 轮首个思考块中文（85/103）后即转英文，第 2–10 轮首个思考块全部 `0` 中文字符 |
+| bootstrap 注入次数 | `11` 次（第 1 轮 2 次、第 2–10 轮各 1 次），累计 `128282` 字符 |
+
+另一条工程模式会话 `session-631c9a16…`：12 轮、**44 次**注入、`513128` 字符。
+
+注入位置（`session-b257acda…` 第 10 轮）：`seq 2912` 用户中文消息 → `seq 2913` 11662 字节
+bootstrap → `seq 2914` 该轮第一段正文（英文）。即每轮生成前最后一条 user 消息是英文。
+
+### 4. 安装与生效边界
+
+`scripts/install.sh`（默认 link 策略）重投影后，`$DSH_HOME/.agent-presets/engineering/` 为真实目录 +
+逐项符号链接；`plugins → $REPO/preset/plugins`，本次改动即时落在安装树：
+
+```
+$ sha256sum $REPO/preset/plugins/bootstrap/index.js \
+            $DSH_HOME/.agent-presets/engineering/plugins/bootstrap/index.js
+b8da4acdc7f1bbe3a141e07ab518c1042c80fa10a82646f4f5ee8074401c9573  …
+b8da4acdc7f1bbe3a141e07ab518c1042c80fa10a82646f4f5ee8074401c9573  …
+```
+
+组合健康（第 2a 层）仍通过：
+
+```
+roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
+2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
+```
+
+**生效仍需重启宿主**：运行中的 host 进程缓存 preset 插件模块（见本文件 2026-09-18 一节的实测）。
+本次**没有**重启 `dsh web`——那会掐断正在写这份记录、也正在跑长任务的会话。
+
+**本次安装的两条环境副作用（如实记录）**：
+
+1. link 策略按本文件 2026-09-18 一节记过的既有缺陷，**清掉了 `.installed.json`**（`plant-core.mjs`
+   的 link 分支 mkdir → 清空 → 只建符号链接 → return，从不写标记）。后果不是丢功能：宿主启动时
+   bundle 安装器命中"destination exists without .installed.json; refusing to touch"，于是**不会**
+   用 profile 里那份旧包覆盖安装树——本次修复反而因此得以保留；代价是每次启动多一行告警。该缺陷
+   本文件上一节已判"未在本计划范围内修"，本次同样未修。
+2. Web profile 里的包拷贝仍是旧版：`$DSH_HOME/profiles/web/node_modules/@goalizc/dsh-engineering/`
+   的 `preset/plugins/bootstrap/index.js` sha-256 为 `0eb7a6d5…`（2026-09-18 的 `npm pack` 产物），
+   与本仓库的 `b8da4acd…` 不同。**走 bundle 通道分发本次修复需要重新打包并重装 profile 包**；
+   `scripts/install.sh` 这条通道已经是最新的。
+
+### 未验证（诚实清单）
+
+- **修复后的真实会话尚未观察**：bootstrap 是否真的从"每步一次"变成"每会话一次"、覆盖句扩写是否
+  真的让思考流转中文，都需要**重启宿主后新建会话**再跑一条中文多轮任务；本文件只给出插件级
+  （自测 + 复现脚本）与失败侧（真实会话）的证据，不把"应该会好"写成"已经好了"。
+- 未在 `--copy` 安装模式下验证本次两个改动。
+- `deriveMessages()` 会包含已注入的 plugin user 消息，是从 harness 的 surface 契约与既有会话转录
+  （注入确被模型看见）推得，**未**用独立探针直接打印一次 `deriveMessages()` 的内容。
+

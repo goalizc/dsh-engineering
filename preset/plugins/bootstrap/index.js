@@ -12,14 +12,25 @@
  *    returned from the `agent/pre-step` waterfall as an additional admitted
  *    `UserMessage`, which is how the harness records durable context. It is
  *    appended after the messages this step already claimed.
- * 2. **Idempotent.** The injected text carries a stable marker. Before injecting,
- *    the listener scans the messages this step would enter; if the marker is
- *    present the bootstrap is already in context and nothing is added.
- * 3. **Re-injected after compaction.** History compaction replaces the older
- *    transcript with a summary, so the marker disappears from the admitted
- *    messages and the next pre-step re-injects automatically. There is no
- *    compaction event to subscribe to, and none is needed: presence in the
- *    admitted batch is the whole condition.
+ * 2. **Idempotent, against the admitted history.** The injected text carries a
+ *    stable marker, and the listener asks the SESSION whether that marker is
+ *    still in its derived model history (`agent.session.deriveMessages()`).
+ *    The hook's own `messages` cannot answer that question: the harness hands
+ *    the waterfall only the batch this step claims from the inbox
+ *    (`ReactLoopInbox.claim`), never the admitted history, so the marker is
+ *    absent from it on every turn — even on the step right after an injection.
+ *    Reading the batch instead of the history is what made an earlier version
+ *    inject 11.7 KB on every input-claiming step.
+ * 3. **Re-injected after compaction.** A compaction `replace` deletes the
+ *    shadowed nodes from the derived history, so the marker stops being found
+ *    and the next pre-step injects again. This needs no compaction event to
+ *    subscribe to: "is it still in the derived history?" is the whole
+ *    condition, and it is answered by the same read as property 2.
+ *
+ * Failure posture: every read of the session history is total. When a session
+ * cannot answer (a harness shape this plugin does not know), the listener falls
+ * back to one injection per session object, which still beats re-injecting on
+ * every step.
  *
  * The content comes from `bootstrap.md` beside the preset — that file is the
  * vendored `using-superpowers` skill plus the harness tool mapping. It is read
@@ -131,14 +142,15 @@ function loadBootstrap(ctx) {
 }
 
 /**
- * Whether a bootstrap is already among the messages this step would admit.
+ * Whether a bootstrap marker sits in any text block of these messages.
  *
- * @param messages - admitted user messages for the proposed step.
+ * @param messages - the messages to scan; a non-array is treated as empty.
  * @returns true when the marker is present.
  */
 function alreadyPresent(messages) {
+  if (!Array.isArray(messages)) return false
   for (const message of messages) {
-    for (const block of message.content) {
+    for (const block of message?.content ?? []) {
       if (block.type === 'text' && typeof block.text === 'string' && block.text.includes(BOOTSTRAP_MARKER)) return true
     }
   }
@@ -146,15 +158,50 @@ function alreadyPresent(messages) {
 }
 
 /**
+ * Whether the bootstrap is still in this agent's admitted model history.
+ *
+ * `Session.deriveMessages()` walks the message surface — the single source of
+ * derived history — and a compaction `replace` drops the shadowed nodes from
+ * it. That makes this one read answer both questions the plugin has: "is the
+ * bootstrap already in context?" and "did a compaction just take it away?".
+ *
+ * @param agent - the agent the pre-step belongs to.
+ * @returns true/false, or undefined when this session cannot answer.
+ */
+function historyHasBootstrap(agent) {
+  let messages
+  try {
+    messages = agent?.session?.deriveMessages?.()
+  } catch {
+    return undefined
+  }
+  return Array.isArray(messages) ? alreadyPresent(messages) : undefined
+}
+
+/**
+ * Sessions this plugin has already injected into, used only when a session
+ * cannot report its own history. A `WeakSet` so a finished session is not
+ * retained by this plugin.
+ */
+const injectedSessions = new WeakSet()
+
+/**
  * Install the bootstrap injection for every agent composed from this preset.
  *
  * @param ctx - the mounting agent-scope context.
  */
 function apply(ctx) {
-  ctx.on('agent/pre-step', async ({ messages, signal, step }, next) => {
+  ctx.on('agent/pre-step', async ({ agent, messages, signal, step }, next) => {
     const decision = await next()
     if (decision.kind === 'reject' || signal.aborted) return decision
     if (alreadyPresent(decision.messages)) return decision
+
+    const inHistory = historyHasBootstrap(agent)
+    if (inHistory === true) return decision
+    if (inHistory === undefined) {
+      const session = agent?.session
+      if (session !== undefined && session !== null && injectedSessions.has(session)) return decision
+    }
 
     // `step === 1` admits the bootstrap on a fresh session even when the step
     // claimed no input of its own; later steps require an admitted batch, so an
@@ -166,6 +213,8 @@ function apply(ctx) {
     if (text === undefined) return decision
 
     const message = createUserMessage({ content: [{ type: 'text', text }], source: BOOTSTRAP_SOURCE })
+    const session = agent?.session
+    if (session !== undefined && session !== null) injectedSessions.add(session)
     return {
       ...decision,
       messages: [...decision.messages, message],
@@ -173,4 +222,4 @@ function apply(ctx) {
   })
 }
 
-export { BOOTSTRAP_MARKER, apply, createUserMessage, name }
+export { BOOTSTRAP_MARKER, alreadyPresent, apply, createUserMessage, historyHasBootstrap, name }

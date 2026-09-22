@@ -21,6 +21,7 @@
 | 5 | `35`、`330`、`340`、`343` | `selftest.mjs` 命名——后按重命名需求改为 `bootstrap.test.mjs` / `caveman-command.test.mjs` 并收进 `npm test`（Task 5） | 使用 `*.test.mjs`，由根测试 glob 收集 |
 | 6 | `764`、`890`、`1086` | 过期测试计数（`11` / `12`）——收编插件自测后为 **15** | 计数随每次收编而变，不要写死 |
 | 7 | `930` | `git add -A` —— 会把无关路径卷入，提交不可审 | 显式逐路径暂存 |
+| 8 | `1075` | 把 bootstrap 幂等写成"扫描**本步将进入的消息**，已在场就什么都不做"——`agent/pre-step` 的 `messages` 只是本步从 inbox claim 到的**增量**（`ReactLoopInbox.claim`），永远不含已注入的那条，按它去重等于**每个 claim 到输入的 step 都重注一次** | 改问会话自己：`agent.session.deriveMessages()` 里还有没有标记（2026-09-22 修复，见 `evidence/VERIFICATION.md` 同名一节） |
 
 **另有一处计划未预见的实现约束**（不属缺陷，但复用本计划必须知道）：**预设本地插件不得 `import` 任何 `@deepseek-ai/*` 包**。实测依据——从检出目录解析 `@deepseek-ai/dsh-llm` 失败（`ERR_MODULE_NOT_FOUND`），只有已安装的 preset 才有 `node_modules` 符号链接，而 `--copy` 安装模式根本没有该链接。故消息对象须用 `node:crypto` 自行构造。详见 spec §8bis E4。
 

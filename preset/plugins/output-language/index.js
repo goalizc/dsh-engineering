@@ -4,7 +4,8 @@
  * The browser's interface language lives in the host user-settings document
  * (`locale.preference`, registered by the harness's own locale row) and nothing
  * on the prompt side reads it. This plugin turns it into one dynamic
- * system-prompt context line, so replies and workflow artifacts follow the
+ * system-prompt context line, so replies, the model's own reasoning and its
+ * progress notes between tool calls, and the workflow artifacts all follow the
  * user's language, with the interface language as the fallback for a message
  * that gives no language cue.
  *
@@ -43,9 +44,18 @@ const VERBATIM_CLAUSE =
 /** The rule that leads every branch: the user's own language wins outright. */
 const RULE_SENTENCE = "Output-language rule: write in the language of the user's message."
 
-/** What the rule covers; a separate sentence so the branches cannot drift. */
+/**
+ * What the rule covers; a separate sentence so the branches cannot drift.
+ *
+ * Coverage names the model's own process explicitly. A rule that says only
+ * "replies and workflow artifacts" leaves the reasoning stream and the progress
+ * notes between tool calls uncovered, and the model then writes its deliverables
+ * in the user's language while thinking and narrating in the prompt's majority
+ * language (measured: a 10-turn zh session at 0.2% CJK in reasoning, 16% in
+ * visible text, with the first narration of 9 of 10 turns in English).
+ */
 const COVERAGE_SENTENCE =
-  'Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items.'
+  'Apply this to everything you write: your replies, your reasoning, your progress notes between tool calls, and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items.'
 
 /** The interface language as a fallback, for a message that gives no language cue. */
 const UNSET_CLAUSE =

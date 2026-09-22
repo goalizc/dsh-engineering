@@ -14,6 +14,8 @@
 - 提示词里现存的"运行时上下文"只有沙箱策略、审批策略、子代理委派三类（`dsh-system-prompt/lib/index.js:43` 的 `CONTEXT_ORDERS`），没有语言位。
 - persona（`preset/agent.cordis.yml`）与注入的 `preset/bootstrap.md` 都是英文净内容，且都没有语言规则 → 默认输出语言事实上由提示词语种决定。
 
+**交付物侧修好之后，过程侧仍然失守（2026-09-22 实测）。** 工程模式、界面 `zh`、用户全程中文的一条 10 轮会话（一个使用本 preset 的工作区）：思考流中文字符 `820 / 438896 = 0.2%`，可见正文 `6461 / 39781 = 16.2%`，10 轮里 9 轮的"轮内第一段话"是英文，长轮（第 4 轮，19 段正文）连收尾都是英文；只有轮末汇总和落盘的 spec/plan 是中文。规则原文只点名 "your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items"，**思考流与工具调用之间的进度旁白不在枚举里**，模型于是把中文用在交付物上、把过程交给提示词的多数语种（英文）。旁证：该会话第 1 轮的第一个思考块是中文（85/103），读完英文技能正文与工具输出后即转英文，此后 9 轮的首个思考块全部 `0` 中文字符——过程语域一旦被英文锚定就会自我延续。
+
 ## 2. 约束（决定了落点）
 
 1. **不改 harness 安装**：`/usr/lib/node_modules/@deepseek-ai/dsh` 的改动会在 DSH 升级时丢失；本需求只在 preset 内落地。
@@ -31,7 +33,7 @@
 **目标**
 
 - 界面 `zh` → 默认中文；界面 `en` → 默认英文；用户在同一条消息里换语言 → 该条跟随用户。
-- 规则覆盖回复正文**与**流程产物（plan、spec、评审意见、TDD red/green 说明、todo 文本）。
+- 规则覆盖回复正文、**思考流与工具调用之间的进度旁白**、以及流程产物（plan、spec、评审意见、TDD red/green 说明、todo 文本）。
 - 代码、标识符、命令、文件路径、错误原文一律不翻译。
 - 界面语言改动的生效延迟 ≤ 1 条回复（下一轮组装即读到新值）。
 - 读不到 `locale` 时不猜：退化为"跟随用户消息语言"。
@@ -51,7 +53,7 @@
 |---|---|
 | 语义 | 界面语言为**默认**；用户改用别的语言提问 → 该条**跟随用户** |
 | 覆盖范围 | 只本 preset（工程模式）；子代理同规则 |
-| 管哪些输出 | 回复正文 + 流程产物；代码/命令/错误原文保持原样 |
+| 管哪些输出 | 回复正文 + 思考流与过程旁白 + 流程产物；代码/命令/错误原文保持原样 |
 | 读不到 `locale` | 退化为"跟随用户消息语言" |
 
 ## 5. 架构与落点
@@ -107,7 +109,7 @@ Output-language rule: write in the language of the user's message.
 覆盖句（逐字，四态皆同）：
 
 ```
-Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items.
+Apply this to everything you write: your replies, your reasoning, your progress notes between tool calls, and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items.
 ```
 
 固定尾句（逐字，四态皆同）：
@@ -119,10 +121,12 @@ Keep code, identifiers, commands, file paths, and error text verbatim: never tra
 四态逐字全行（示例 `zh`）：
 
 ```
-Output-language rule: write in the language of the user's message. Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue. Apply this to your replies and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language rule: write in the language of the user's message. Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue. Apply this to everything you write: your replies, your reasoning, your progress notes between tool calls, and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 ```
 
 **为什么改成规则前置（实测失败驱动）**：真会话实测，界面 `zh`、用户发**纯英文**消息（`Summarize in one sentence what the README says this preset bundles.`），模型用中文作答，而那条 `Interface language: zh (Chinese).` 行确实在提示词里、且携带了"用户换语言则跟随用户"的例外句。诊断：旧文本把**界面语言命令放在首位**，跟随用户的例外句排在后面，模型执行了前面那条命令、忽略了后面的例外。Owner 决策：**规则前置**——"按用户消息的语言作答"领起，界面语言降级为"消息没有语言线索时"的兜底。自测同步加了顺序守卫（`output-language.test.mjs` 第 4b 组）：断言 `language of the user's message` 的位置**先于** `Interface language:`，四个状态（`zh`/`en`/`ja`/未设置）逐一检查；该守卫在改写前必然失败，是这条缺陷的回归网。
+
+**为什么把覆盖句从"交付物"扩到"过程"（实测失败驱动）**：见 §1 末段——交付物已经是中文，思考流与轮内旁白仍是英文。规则是提示词级约束，唯一能触及思考语种的位置就是这条覆盖句，所以把 `your reasoning, your progress notes between tool calls` 写进枚举，消掉"过程不在管辖范围内"这个歧义。它**不承诺**思考一定变中文（见 §10 的遵从度条目），但把规则文本与用户诉求对齐。三处冻结副本同步改：`output-language.test.mjs` 的四态整行 golden、`scripts/output-language.test.mjs` 从 §6 抽取覆盖句的正则、README 的示例行——任一处漏改即红。
 
 - tag 合法性沿用 DSH 的 BCP 47 风格形状（`/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/`），但**在本仓库内重新声明**，不 import harness。
 - 未知 tag **不猜**语言名，直接把它当作目标语言标签写进句子（用户以后在设置里加语言时无需改插件）。
@@ -187,7 +191,7 @@ Output-language rule: write in the language of the user's message. Interface lan
 
 - **`settings` 服务在 preset realm 的可解析性**：未实测。设计已给出等价降级（读 settings 文件），并把探测放在计划首任务；这是本设计唯一的架构性未知。
 - **子代理在同 preset 下的组装路径**：按组合事实推断（子代理默认用同 preset，persona 行对子代理同样生效），实测场景 4 覆盖。
-- **模型遵从度**：规则是提示词级约束，不是强制。措辞采用"Identity 之后、策略之前"的固定行，与既有 `sandbox:policy` 行同级，遵从度与现有策略行一致；不做额外加固（YAGNI）。
+- **模型遵从度**：规则是提示词级约束，不是强制。措辞采用"Identity 之后、策略之前"的固定行，与既有 `sandbox:policy` 行同级，遵从度与现有策略行一致；不做额外加固（YAGNI）。覆盖句现已点名思考流与工具间隙的过程旁白（§6），但**思考语种最终由模型决定**：这条规则提高遵从概率，不构成保证；实测口径与结果见 `evidence/VERIFICATION.md` 的 2026-09-22 一节。
 
 ## 11. 明确不做
 
