@@ -750,3 +750,25 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
 **我在本轮中犯的一次判断错误（如实记录）**：我先前看到转录里 `Check bash descriptions landed in Chinese` 等英文描述时，主观认为"我写的是中文、只是转录滞后"，并据此向你报告"第 1 项通过"。原始 `tool/call` 的 `arguments` 显示那些调用写的就是英文——**我的自述不能作为证据，转录才是**。此错误是本次把 `bash.description` 单列成硬指标的直接原因。
 
 **据此的处置**：L1 增加独立强断言段（`This is a hard requirement, not a preference…`，并把尾句扩为含工具名与枚举值不译），提交 `4219b48`；成本由 240 增至 `1102` 字符，已写入 README 与 spec §10，并预留回退点。**强化后的遵从度尚未实测**——需要再次重启宿主装载。
+
+### §12.4 逐项验收（2026-09-23，第二轮：L1 强化后）
+
+宿主重启装载强化版 L1（转录行 1632 起，该版含 `hard requirement, not a preference`）后重测：
+
+| 阶段 | `bash`/`pwsh` 的 `description` 中文比例 |
+|---|---|
+| 强化前（全部历史） | `1/189 = 1%` |
+| **强化后（本轮）** | **`5/5 = 100%`** |
+
+5 条样本逐条全为中文，其中一条的命令体是大段英文脚本（`python3 -c '...'`）——即"命令本身是英文、所以描述也跟着英文"这条路径被那句 `not only when the surrounding command or path happens to be in 中文` 堵住了。
+
+**结论**：§12 的四项验收在第二轮全部通过——
+
+1. L1/L2 装载 ✅（本轮 system 段含强化句）
+2. `bash.description` 中文 ✅（`5/5`，对照强化前 `1%`）
+3. `subagent.description` 中文 ✅（`验收子代理提示词语言`）
+4. `subagent.prompt` 中文且子代理正常完成 ✅（`d59b16ee…`、`6a898ed9…` 两例）
+
+**代价（如实记录，已写入 README 与 spec §10）**：L1 由约 240 增至 `1102` 字符、每步重发；L2 由约 110 增至 `199` 字符、每条用户消息。这是"工具字段必须本地化"的可见成本，不再是噪声级。
+
+**仍未覆盖**：`present.files[].description` 与越权 `justification` 在本轮 v2 实现里尚未被触发过（前者需要交付文件、后者需要一次沙箱越权被拒），因此**这两项没有实测样本**，只由同一句 L1 断言覆盖，不得记为已验收。
