@@ -50,7 +50,12 @@ takisy 工作区最新会话 `session-d0c635f9-875d-4dc4-934d-fda5a2f3bbec`（20
 
 新增约束：
 
-1. **`systemPrompt.section()` 在 preset realm 的可调用性是本设计唯一的架构性未知。** 旁证是同一 scope 的 `systemPrompt.context()` 已实测可用（那行确实进了会话），且 `dsh-system-prompt` 的 `section()` 与 `context()` 走同一套 `layers.effect` 注册路径；但 `section()` 从 preset realm 调过没有实证。实施计划的第一个任务必须是探针（见 §9）。
+1. **`systemPrompt.section()` 在 preset realm 的可调用性：已用代码级证据关闭（2026-09-23）。** 原判为"唯一架构性未知"，实施时改用无需重启宿主的取证，三条证据合起来是决定性的：
+   - **harness 自己的加载器文档**（`@deepseek-ai/dsh-agent-presets/lib/index.js` 的 `mount` 模块）逐字写着：entry contexts chain to the context the subtree was plugged into, so every `ctx.tools` and `ctx.systemPrompt` registration inside the preset files into **that agent's layer** and unwinds with it。
+   - **该方法确实存在**：运行时内省 `dsh-system-prompt` 的 `SystemPrompt.prototype`，`section` / `context` / `getSectionOrder` 都在同一个类上（`typeof … === 'function'`）。**不存在"有 `context` 没有 `section`"的宿主版本**。
+   - **该 realm 确实能拿到这个服务**：v1 的 `context()` 已在真会话里跑通（语言行进了转录），而同一次 `inject(['systemPrompt'])` 给的就是同一个 `scope.systemPrompt` 对象。
+
+   因此不再安排运行时探针，**也不需要为此重启宿主**。仍未观察到的只剩"section 文本在渲染后的 system 消息里出现、且位于 persona 之前"这一**观测量**（不是未知项）——它由 §9 的端到端实测覆盖。
 2. **`order` 只能取数值**，且同一 scope 内重名 section 会被 `NamedEntries` 拒绝。`SECTION_ORDERS` 里 `HARNESS_IDENTITY = -1000`、`DEPLOYMENT_PERSONA_PREFIX = 0`；本设计取 `-1`（见 §5）。
 3. **L2 注入不得查历史。** bootstrap 的幂等靠 `agent.session.deriveMessages()` 扫标记，那是"每会话一次"的判据；L2 要"每条用户消息一次"，判据必须落在**本步 claim 到的消息**上（见 §7）。
 
@@ -211,7 +216,7 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 
 ## 9. 测试与验证
 
-**探针（实施计划的首任务，先于一切实现）**：起一条真会话，确认 `scope.systemPrompt.section()` 在 preset realm 可调用，由模型逐字贴出新 L1 文本。**不以推断代替取证。** 若不可调用，**回来改本设计**（唯一备选是把 L1 文本并进 persona `prefix`，代价是语言冻结为启动快照、渲染逻辑两处实现）；探针失败不得静默降级成 §8 那条 try/catch——那条守卫的是"未来宿主移除了 section API"，不是"当前宿主不支持"。
+**架构性未知已关闭，不设探针任务**：原先计划先跑一个真会话探针，实测 `scope.systemPrompt.section()` 是否可从 preset realm 调用。该问题在实施时用三条代码级证据回答完毕（见 §3 约束 1）：加载器自己声明 preset 的 `ctx.systemPrompt` 注册进 agent 层、`section` 与 `context` 同在一个 `SystemPrompt` 原型上、`context()` 已实测在该 realm 跑通。**因此不安排探针、不需要为它重启宿主。** §8 那条 `section()` 缺失的 try/catch 保留，但它守的是"未来宿主移除了 section API"，不是"当前宿主不支持"；真的不可用时，唯一备选是把 L1 文本并进 persona `prefix`（代价是语言冻结为启动快照、渲染逻辑两处实现）。
 
 `preset/plugins/output-language/output-language.test.mjs`（无框架 plain-assert，可 standalone 跑；安装门禁要求同名文件存在）：
 
@@ -243,7 +248,7 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 
 ## 10. 未验证点与风险
 
-- **`systemPrompt.section()` 在 preset realm 的可调用性**：未实测（§3 约束 1、§9 探针）。这是本设计唯一的架构性未知。
+- **`systemPrompt.section()` 在 preset realm 的可调用性**：已用代码级证据关闭（§3 约束 1），不再列为未知。剩下的只是**观测量**——section 文本在渲染后的 system 消息里出现、且位于 persona 之前——由 §9 的端到端实测覆盖。
 - **模型遵从度**：规则是提示词级约束，不是熔断。本次把规则提升到 system 层并加了近因锚定，**提高遵从概率，不构成保证**；若诊断正确（§2），预期改善显著，但可能仍达不到 §9 的 ≥ 50% 门槛。**达标与否以实测为准，不达标就如实记失败**，不修改门槛来"通过"。
 - **与 §9 门槛相关的反例**：本轮分析量化的是 2 轮 18 步、6.4 万字符思考的一条会话，样本量小。
 - **三份 `createUserMessage` 拷贝**：`bootstrap`、`caveman-command`、`output-language`。bootstrap 源码已声明前两份必须同提交同改；本次加入第三份，同一纪律适用。
