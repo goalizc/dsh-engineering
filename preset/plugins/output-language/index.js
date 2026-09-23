@@ -117,7 +117,7 @@ function languageName(tag) {
 function renderLanguageDirective(tag) {
   const resolved = tagOrFallback(tag)
   const label = languageName(resolved)
-  return `Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in ${label} (${resolved}). Never write any of it in another language. ${DIRECTIVE_VERBATIM}`
+  return `Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in ${label} (${resolved}). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. ${DIRECTIVE_VERBATIM}`
 }
 
 /**
@@ -132,7 +132,7 @@ function renderLanguageDirective(tag) {
 function renderLanguageReminder(tag) {
   const resolved = tagOrFallback(tag)
   const label = languageName(resolved)
-  return `Language: ${label} (${resolved}). Reason, reply, narrate, and write every artifact in ${label} only. ${REMINDER_VERBATIM}`
+  return `Language: ${label} (${resolved}). Reason, reply, narrate, and write every artifact in ${label} only — including what you put in tool-call fields and in a delegated prompt. ${REMINDER_VERBATIM}`
 }
 
 /**

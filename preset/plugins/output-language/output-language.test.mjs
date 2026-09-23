@@ -47,17 +47,17 @@ import {
  * file itself; these literals stay independent of both plugin and spec.
  */
 const DIRECTIVE = {
-  zh: 'Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in 中文 (zh). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.',
-  en: 'Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in English (en). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.',
-  ja: 'Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in ja (ja). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.',
-  unset: 'Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in 中文 (zh). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.',
+  zh: "Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in 中文 (zh). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.",
+  en: "Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in English (en). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.",
+  ja: "Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in ja (ja). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.",
+  unset: "Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in 中文 (zh). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.",
 }
 
 const REMINDER = {
-  zh: 'Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only. Keep code, commands, paths, and errors verbatim.',
-  en: 'Language: English (en). Reason, reply, narrate, and write every artifact in English only. Keep code, commands, paths, and errors verbatim.',
-  ja: 'Language: ja (ja). Reason, reply, narrate, and write every artifact in ja only. Keep code, commands, paths, and errors verbatim.',
-  unset: 'Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only. Keep code, commands, paths, and errors verbatim.',
+  zh: "Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.",
+  en: "Language: English (en). Reason, reply, narrate, and write every artifact in English only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.",
+  ja: "Language: ja (ja). Reason, reply, narrate, and write every artifact in ja only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.",
+  unset: "Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.",
 }
 
 assert.equal(name, 'output-language', 'plugin name')
@@ -105,10 +105,17 @@ for (const tag of ['zh', 'en', 'ja', undefined]) {
 }
 
 // 4. Both texts name the language twice (label + target) and carry the verbatim
-//    clause: these are the two properties a rewording could silently drop.
+//    clause: these are the two properties a rewording could silently drop. The
+//    "never another language" check spans the terminating punctuation on purpose
+//    — the clause grew an `, including those tool-call fields …` tail, and the
+//    guard is about the prohibition, not about which mark ends it.
 for (const tag of ['zh', 'en', 'ja', undefined]) {
   const directive = renderLanguageDirective(tag)
-  assert.ok(directive.includes('Never write any of it in another language.'), 'directive forbids other languages')
+  assert.match(
+    directive,
+    /Never write any of it in another language[.,]/,
+    'directive forbids other languages',
+  )
   assert.ok(
     directive.includes('Keep code, identifiers, commands, file paths, and error text verbatim'),
     'directive keeps code verbatim',

@@ -721,3 +721,15 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
 - **`en` 界面下的多轮行为未观察**：热切换已证 L1/L2 会变，但未在 `en` 下跑完整任务确认思考也随之为英文。
 - 未在 `--copy` 安装模式下验证本次改动。
 - 子代理只回了报告文本；其**思考流**语种未测（本次只看了它的报告与 system 段）。
+
+## 2026-09-23 追加需求：工具调用字段与委派提示词（v2 §12）
+
+**触发**：v2 首版落地并通过端到端实测后，owner 扩大范围——"`bash` 等一些 `description` 也都使用界面设置语言，总之，所有内容都使用界面设置语言"。
+
+**范围查证（读 harness 源码，非推断）**：进界面的模型生成字段——`bash`/`pwsh` 的 `description`（调用树摘要白名单 `dsh-client-ui-tool/lib/client.js:883` `SUMMARY_KEYS.bash = ["description","command"]`，终端卡片 props 同文件 `503`/`592-610`，schema 明文 "(shown in the UI)"）、`present.files[].description`、越权 `justification`（`dsh-sandbox/lib/index.js:102` 拼成 `reason: escalate sandbox to ${mode}: ${justification}`）、`subagent.description`（`dsh-tool-subagent/lib/index.js:510`/`529` 做卡片 `label`）、`todo_write.todos[].content`（`planSummary` 进调用树）。另按 owner 决定纳入 `subagent`/`subagent_fork`/`workflow`/`ralph` 的提示词正文。完整清单与"不译的例外"见 v2 spec §12。
+
+**改动**：只改两段规则文本（L1 加字段与委派枚举、L2 加短句），三层机制不动。三处冻结副本（插件自测 golden / v2 spec §6 / README 示例）**全部由渲染器导出后程序化写入**，避免手抄漂移——落盘后校验结果为 `L1 状态行 4 / L2 状态行 4 / 与渲染器全等: true`。组合行注释同步补了范围。
+
+**验收**：`npm test` `38 pass / 0 fail`、`node preset/plugins/output-language/output-language.test.mjs` 全绿、`node scripts/verify-composition.mjs` `2a OK`。落地过程中修正一处测试脆弱点：第 4 组断言硬编码了旧句的结尾句号，而新句改为逗号 + 续句，遂改为跨标点的正则 `/Never write any of it in another language[.,]/`（守的是"禁止别的语言"这个语义，不是哪个标点收尾）。
+
+**未验证**：新措辞需要**重启宿主**才装载（插件代码改动，见生效边界）；装载后需按 v2 spec §12.4 逐项验收——`bash.description` 为中文、越权 `justification` 为中文、`present`/`subagent` 的 `description` 为中文、`subagent.prompt` 为中文且子代理能正常完成。本次尚未跑。

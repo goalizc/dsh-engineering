@@ -65,7 +65,7 @@ takisy 工作区最新会话 `session-d0c635f9-875d-4dc4-934d-fda5a2f3bbec`（20
 |---|---|
 | 语言从哪来 | **只读 host 设置 `locale.preference`**；不去分析用户本条消息的语言 |
 | 读不到 / 非法值 | **兜底中文**（这是相对 v1 的行为变更：v1 是"从不假设语言"） |
-| 覆盖范围 | agent 写出的**全部文本**：思考流、可见回复、工具间隙旁白、流程产物（plan/spec/评审/TDD 说明/todo）；代码、标识符、命令、路径、报错原文不译 |
+| 覆盖范围 | agent 写出的**全部文本**：思考流、可见回复、工具间隙旁白、流程产物（plan/spec/评审/TDD 说明/todo）、**工具调用参数里的可见字段**（见 §12 的清单）、**交给另一个 agent 的提示词/任务书**；代码、标识符、命令、路径、报错原文不译 |
 | 落点 | 三层：L1 system 段（每步）+ L2 每条用户消息后的提醒 + 删除 L3 旧上下文行 |
 | 频率 | L2 **每条用户消息都注入** |
 | 范围 | 只本 preset（工程模式）；子代理由同一 preset 组装，自动覆盖 |
@@ -140,13 +140,13 @@ ctx.on('agent/pre-step', async ({ messages, signal, step }, next) => {
 **L1 逐字模板**（`{language}` / `{tag}` 由语言名表代入）：
 
 ```
-Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in {language} ({tag}). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in {language} ({tag}). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 ```
 
 **L2 逐字模板**：
 
 ```
-Language: {language} ({tag}). Reason, reply, narrate, and write every artifact in {language} only. Keep code, commands, paths, and errors verbatim.
+Language: {language} ({tag}). Reason, reply, narrate, and write every artifact in {language} only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
 ```
 
 **四态逐字全行（冻结副本，两套守卫的跨校验源）**
@@ -155,25 +155,25 @@ Language: {language} ({tag}). Reason, reply, narrate, and write every artifact i
 
 L1（`renderLanguageDirective`）：
 
-Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in 中文 (zh). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in 中文 (zh). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 
-Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in English (en). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in English (en). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 
-Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in ja (ja). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in ja (ja). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 
-Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in 中文 (zh). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in 中文 (zh). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 
 （第 4 行与第 1 行逐字相同：`undefined` 与 `'zh'` 同文本，这是"兜底中文"的定义。守卫断言的是"抽到的第 4 行 == `renderLanguageDirective(undefined)`"，不是两行互不相等。）
 
 L2（`renderLanguageReminder`）：
 
-Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only. Keep code, commands, paths, and errors verbatim.
+Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
 
-Language: English (en). Reason, reply, narrate, and write every artifact in English only. Keep code, commands, paths, and errors verbatim.
+Language: English (en). Reason, reply, narrate, and write every artifact in English only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
 
-Language: ja (ja). Reason, reply, narrate, and write every artifact in ja only. Keep code, commands, paths, and errors verbatim.
+Language: ja (ja). Reason, reply, narrate, and write every artifact in ja only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
 
-Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only. Keep code, commands, paths, and errors verbatim.
+Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
 
 **为什么不再"规则前置 + 跟随用户"**：v1 的规则句（`write in the language of the user's message`）与例外句（`use Chinese only when the user's message gives no language cue`）是为了表达"界面语言为默认、用户换语言则跟随"。用户已把语义收紧为"一律用界面语言"，例外句消失，v1 §6 记录的那个实测失败模式（界面语言命令执行、跟随例外被忽略）随之不存在——措辞可以直接下命令。
 
@@ -253,6 +253,8 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 - **与 §9 门槛相关的反例**：本轮分析量化的是 2 轮 18 步、6.4 万字符思考的一条会话，样本量小。
 - **三份 `createUserMessage` 拷贝**：`bootstrap`、`caveman-command`、`output-language`。bootstrap 源码已声明前两份必须同提交同改；本次加入第三份，同一纪律适用。
 - **成本**：L1 每步重发约 240 字符；L2 每条用户消息约 110 字符。相对被替换掉的 419 字符一次性上下文行，是净增，但仍在噪声级。
+- **把委派提示词也要求成中文的代价（2026-09-23 追加）**：`subagent` 若路由到 `claude-code` / `codex` 这类外部代理，中文任务书可能**降低其执行准确度**；本仓库只把语言要求交给模型，不评估下游模型的语言能力。若日后发现下游执行质量下降，回退点是把 §12.2 从枚举里删掉——规则文本、测试与文档三处同步改即可。
+- **成本增额（2026-09-23 追加）**：L1 由约 240 增至约 560 字符（每步重发），L2 由约 110 增至约 165 字符（每条用户消息）。相对被替换掉的 419 字符一次性上下文行，仍属噪声级，但比 v2 首版明显。
 
 ## 11. 明确不做
 
@@ -261,4 +263,42 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 - **不做"识别用户本条消息语言"**：用户已明确改为读设置（§4）。
 - **不改 persona `prefix`**：理由见 §5。
 - **不写 harness 侧补丁**：升级即丢，且把用户设置契约固化进 harness 不是本仓库的职责。
+- **不翻译本 spec 的规则文本自身**（L1/L2）：它必须对任意界面语言生效，"把规则翻译成界面语言"会让 `en` 界面读不到中文规则、`zh` 界面读不到英文规则。
+- **不改 harness 拥有的静态文本**：工具描述、参数描述、审批弹窗的 `escalate sandbox to …:` 前缀。理由与上一条同源：那是 harness 的字符串，本仓库没有改它的契约（见 §12.3）。
 - **不删 v1 spec 文件**：它是 2026-09-17/09-22 的实测记录，仍被 `docs/superpowers/plans/2026-09-17-output-language.md` 与 `.superpowers/sdd/` 下的历史报告引用；仅在其正文加一行"渲染规则已被 v2 取代"的指引。冻结子句的唯一权威副本因此转移到本文件 §6，两套守卫都改读本文件——避免"两个 spec 都声称自己是冻结源"的歧义。
+
+## 12. 追加需求（2026-09-23，落地后扩展）：工具调用字段与委派提示词
+
+**触发**：v2 落地并通过端到端实测后，owner 提出范围扩展——"`bash` 等一些 `description` 也都使用界面设置语言，总之，所有内容都使用界面设置语言"。原覆盖句只点名 agent 写出的**叙述性文本**，没有点名**工具调用参数里的可见字段**，也没有点名**交给另一个 agent 的提示词**。
+
+### 12.1 进界面的模型生成字段（已查证，非推断）
+
+| # | 字段 | 证据（harness 源码） |
+|---|---|---|
+| 1 | `bash.description`、`pwsh.description` | 调用树摘要白名单 `SUMMARY_KEYS.bash = ["description","command"]`（`dsh-client-ui-tool/lib/client.js:883`）；终端卡片把 `description` 作为 props 渲染（同文件 `503`、`592-610`）；schema 明文 "(shown in the UI)"（`dsh-tool-bash/lib/index.js:268-271`）；校验器强制非空（同文件 `121`） |
+| 2 | `present.files[].description` | schema："Brief description for the user."（`dsh-tool-present`） |
+| 3 | 越权 `justification` | `dsh-tool-bash` 把 `justification` 交给 `approveEscalation`（`238-246`）；`dsh-sandbox/lib/index.js:102` 组装为 `reason: \`escalate sandbox to ${mode}: ${justification}\``；客户端把 `pending.reason` 直接显示（`dsh-client-ui-approval/lib/client.js:73`） |
+| 4 | `subagent.description` | schema："A short (3-5 word) description of the delegated task, for display."；`dsh-tool-subagent/lib/index.js:510`、`529` 把它做成卡片 `label` |
+| 5 | `todo_write.todos[].content` | `planSummary(todos)` 进调用树（`dsh-client-ui-tool/lib/client.js:2240`）；L1 已点名 `todo text` |
+| 6 | 调用树兜底 | `deriveSummary` 在白名单键都缺席时**取任意非空字符串参数**（`dsh-client-ui-tool/lib/client.js:899-911`） |
+
+### 12.2 交给另一个 agent 的提示词（owner 明确纳入）
+
+`subagent.prompt`、`subagent_fork.prompt`、`workflow` 的 agent 提示词正文、`ralph` 的 `objective`。
+
+**这不是界面字段**，纳入是 owner 的决定：让子代理会话的转录与它自己的提示词一致。代价见 §10 的新增条目。
+
+### 12.3 仍然不译（"所有内容"的例外）
+
+- **必须保持原文的字段值**：`command`、`file_path`、`query`/`pattern`、`url`、工具名与枚举值（`workspace-write` 等）、提交哈希。
+- **harness 拥有的静态文本**：工具描述与参数描述本身、系统级消息（例如审批弹窗里 `escalate sandbox to workspace-write:` 这个前缀由 `dsh-sandbox` 写死）。**本设计改不了它们，也不假装能改**；弹窗里模型能控的只有 `justification`，所以那一行是"英文前缀 + 中文说明"。
+- **本 spec 的规则文本自身**（L1/L2）：永不翻译，它们要能对任意界面语言生效。
+
+### 12.4 验收口径（逐项检查，不看总体比例）
+
+端到端实测（§9）除三条 CJK 指标外，必须逐项确认：
+
+1. 至少 3 次 `bash` 调用里 `description` 为中文；
+2. 任何沙箱越权调用的 `justification` 为中文；
+3. 出现 `present` / `subagent` 时，其 `description` 为中文；
+4. 派子代理时，`subagent.prompt` 正文为中文（且子代理能正常完成——见 §10 的代价）。

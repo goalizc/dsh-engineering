@@ -59,16 +59,18 @@ Superpowers 全流程不再无条件施加到每个任务。注入文本里有�
 **L1——system-prompt 段（`order: -1`，每步随 system 重发，排在 persona 之前）**：
 
 ```
-Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, and every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text) — in 中文 (zh). Never write any of it in another language. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in 中文 (zh). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
 ```
 
 **L2——每条人类用户消息之后的提醒**（`agent/pre-step`，紧跟本步 claim 到的消息；判据是**本步的批次**，不查历史，所以每个回应人类的步都会得到一条）：
 
 ```
-Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only. Keep code, commands, paths, and errors verbatim.
+Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
 ```
 
 **代码、标识符、命令、路径、错误原文一律不翻译。**
+
+**范围含工具调用参数里的可见字段与交给另一个 agent 的提示词**（2026-09-23 追加）。规则点名的不只是叙述文本，还包括：`bash` / `pwsh` 的 `description`（调用树与终端卡片直接渲染它，见 `dsh-client-ui-tool/lib/client.js:883`）、`present` 的 `files[].description`、沙箱越权的 `justification`（`dsh-sandbox/lib/index.js:102` 把它拼进审批弹窗的 `reason`）、`subagent` 的 `description`、`todo_write` 的 `content`，以及 `subagent` / `subagent_fork` / `workflow` / `ralph` 的提示词正文。**不译的例外**：`command`、`file_path`、`query`/`pattern`、`url`、工具名与枚举值，以及 harness 写死的字符串（例如审批弹窗那半句 `escalate sandbox to workspace-write:`）。证据清单见 v2 spec §12。
 
 为什么要两处（2026-09-23 实测驱动）：v1 只有一条 **user 角色**的运行时上下文行，规则文本已经点名 reasoning 与过程旁白，实测仍失守——一条 2 轮会话里思考块**首词 18/18 是英文**，剥掉引用块后思考 CJK 只有 `3.7%`（第 1 轮 `0.19%`），而可见正文 `37.3%`。诊断是投递层与近因：规则不在 system 里，且一轮英文锚定自我延续（T2 才升到 7.5%）。详见 `evidence/VERIFICATION.md` 的 2026-09-23 一节。
 
@@ -78,6 +80,7 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 - **插件 / 组合代码改动需要重启宿主**（`dsh web`）：运行中的 host 进程缓存 preset 插件模块（Node ESM 模块缓存），**只新建会话不够**。
 - 安装/刷新 preset 后仍需**新建会话**（DSH 会话一旦开始不能切换模式）。
 - **思考语种是提示词级引导，不是熔断**：v2 把它提到 system 层并加了每轮近因，仍不构成保证。
+- **中文任务书可能降低外部代理的执行准确度**：`subagent` 若路由到 `claude-code` / `codex`，规则会要求提示词正文用界面语言。本仓库只把语言要求交给模型，不评估下游模型的语言能力；若要回退，把委派提示词从覆盖枚举里删掉即可（规则文本、测试与文档三处同步改）。
 - **`settings` 服务不可达时没有界面信号**：降级静默生效（插件只 `warn` 一次），唯一判据是渲染出的文本——它会落到中文兜底那一支。
 - 界面语言是 `en` 时，本规则要求**连思考也用英文**；不会跟随你自己消息的语言。
 

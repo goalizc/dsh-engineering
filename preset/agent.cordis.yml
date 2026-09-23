@@ -282,7 +282,10 @@
 
 # 输出语言（v2）：把 host 用户设置里的 `locale.preference` 落成两处——一条
 # `order: -1` 的 system-prompt 段（每步重发、排在 persona 之前），以及一条紧跟
-# 本步人类用户消息的短提醒（agent/pre-step，近因锚定）。读不到设置时兜底中文。
+# 本步人类用户消息的短提醒（agent/pre-step，近因锚定）。规则覆盖 agent 写出的
+# 全部文本，**含工具调用参数里的可见字段**（bash/pwsh 的 description、present 的
+# description、越权 justification、subagent 的 description）**与交给另一个 agent
+# 的提示词/任务书**；代码、路径、命令、报错原文与工具名不译。读不到设置时兜底中文。
 # 与 bootstrap 同构：自包含、不 import harness 包、preset 相对行。
 - id: output-language
   name: './plugins/output-language/index.js'
