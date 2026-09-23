@@ -280,9 +280,10 @@
 - id: bootstrap
   name: './plugins/bootstrap/index.js'
 
-# 输出语言：把 host 用户设置里的 `locale.preference` 渲染成一条动态运行时
-# 上下文行，让回复与流程产物跟随界面语言（界面语言为默认；用户改用别的语言
-# 时跟随用户）。与 bootstrap 同构：自包含、不 import harness 包、preset 相对行。
+# 输出语言（v2）：把 host 用户设置里的 `locale.preference` 落成两处——一条
+# `order: -1` 的 system-prompt 段（每步重发、排在 persona 之前），以及一条紧跟
+# 本步人类用户消息的短提醒（agent/pre-step，近因锚定）。读不到设置时兜底中文。
+# 与 bootstrap 同构：自包含、不 import harness 包、preset 相对行。
 - id: output-language
   name: './plugins/output-language/index.js'
 

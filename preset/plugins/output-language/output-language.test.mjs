@@ -22,6 +22,9 @@ import { fileURLToPath } from 'node:url'
 
 import {
   LANGUAGE_TAG,
+  SECTION_NAME,
+  SECTION_ORDER,
+  apply,
   name,
   renderLanguageDirective,
   renderLanguageReminder,
@@ -190,4 +193,65 @@ assert.ok(
   'plugin must not import harness packages',
 )
 
-console.log('selftest OK: output-language (renderers)')
+// 11. `apply` registers exactly one dynamic SECTION and NO runtime context.
+//     The context assertion is the regression for the v1 delivery layer: a
+//     leftover `context()` call would publish a second, weaker copy of the rule
+//     as a user-role history message, which is precisely what v2 replaces.
+const injected = []
+const sectionCalls = []
+const contextCalls = []
+// Mutable settings document on purpose: the section provider must read it at
+// use time. A snapshot taken at registration would pass a one-shot assertion
+// and silently break "a settings change applies to the next turn", so the
+// second read must follow the change.
+const liveSettings = { preference: 'en' }
+const fakeCtx = {
+  get: () => ({ get: () => liveSettings }),
+  inject(services, callback) {
+    injected.push(services)
+    callback({
+      systemPrompt: {
+        section: (entry) => sectionCalls.push(entry),
+        context: (entry) => contextCalls.push(entry),
+      },
+    })
+  },
+  on: () => () => {},
+  logger: { warn: () => {} },
+}
+apply(fakeCtx)
+assert.deepEqual(injected, [['systemPrompt']], 'injects the systemPrompt service')
+assert.equal(sectionCalls.length, 1, 'registers exactly one system-prompt section')
+assert.equal(sectionCalls[0].name, SECTION_NAME, 'section name')
+assert.equal(sectionCalls[0].order, SECTION_ORDER, 'section order sits above the persona prefix')
+assert.equal(sectionCalls[0].order, -1, 'section order is -1')
+assert.equal(typeof sectionCalls[0].text, 'function', 'section text is a provider, not a frozen string')
+assert.equal(contextCalls.length, 0, 'v2 registers no runtime context: the user-role delivery layer is gone')
+assert.equal(sectionCalls[0].text(), DIRECTIVE.en, 'provider renders the live setting')
+liveSettings.preference = 'zh'
+assert.equal(
+  sectionCalls[0].text(),
+  DIRECTIVE.zh,
+  'provider re-reads the setting on every assembly (dynamic, not a snapshot)',
+)
+
+// 12. A harness whose systemPrompt has no `section()` must lose L1 only: the
+//     failure is swallowed, warned once, and never reaches the session start.
+const noSectionWarnings = []
+const legacyCtx = {
+  get: () => ({ get: () => liveSettings }),
+  inject(services, callback) {
+    callback({ systemPrompt: { context: () => {} } })
+  },
+  on: () => () => {},
+  logger: { warn: (message) => noSectionWarnings.push(message) },
+}
+assert.doesNotThrow(() => apply(legacyCtx), 'a missing section() must not break the mount')
+assert.equal(noSectionWarnings.length, 1, 'the degraded mount warns exactly once')
+assert.match(
+  noSectionWarnings[0],
+  /output-language: systemPrompt\.section\(\) unavailable/,
+  'the warning names the lost capability',
+)
+
+console.log('selftest OK: output-language')
