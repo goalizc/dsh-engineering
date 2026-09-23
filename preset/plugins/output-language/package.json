@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Renders the interface language as a dynamic system-prompt context line for agents on this preset.",
+  "description": "Renders the interface language as a standing system-prompt section plus a per-message reminder for agents on this preset.",
   "main": "index.js",
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2"
