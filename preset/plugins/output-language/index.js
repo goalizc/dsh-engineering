@@ -53,9 +53,16 @@ const FALLBACK_TAG = 'zh'
 /** Language names we can name confidently; every other tag speaks for itself. */
 const LANGUAGE_NAMES = { zh: '中文', en: 'English' }
 
-/** Fixed closing clause: translation may never touch code, paths, or errors. */
+/**
+ * Fixed closing clause: translation may never touch code, paths, or errors.
+ *
+ * It also names tool names and enum values, because the strengthened tool-field
+ * sentence invites over-translation in the other direction: a model told to
+ * localize `description` fields must not conclude that `sandbox_permissions:
+ * workspace-write` is prose.
+ */
 const DIRECTIVE_VERBATIM =
-  'Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.'
+  'Keep tool names, enum values, code, identifiers, commands, file paths, and error text verbatim: never translate them.'
 
 /** The reminder's shorter verbatim clause. */
 const REMINDER_VERBATIM = 'Keep code, commands, paths, and errors verbatim.'
@@ -117,7 +124,7 @@ function languageName(tag) {
 function renderLanguageDirective(tag) {
   const resolved = tagOrFallback(tag)
   const label = languageName(resolved)
-  return `Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in ${label} (${resolved}). Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. ${DIRECTIVE_VERBATIM}`
+  return `Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in ${label} (${resolved}). This is a hard requirement, not a preference: the description fields of your tool calls are shown to the user verbatim, so write them in ${label} on every single call — not only when the surrounding command or path happens to be in ${label}. A tool's own schema documents its field in English; that documents the field, it does not license an English value. Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. ${DIRECTIVE_VERBATIM}`
 }
 
 /**
@@ -251,6 +258,7 @@ function apply(ctx) {
 }
 
 export {
+  DIRECTIVE_VERBATIM,
   FALLBACK_TAG,
   LANGUAGE_NAMES,
   LANGUAGE_TAG,
