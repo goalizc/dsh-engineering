@@ -254,7 +254,7 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 - **三份 `createUserMessage` 拷贝**：`bootstrap`、`caveman-command`、`output-language`。bootstrap 源码已声明前两份必须同提交同改；本次加入第三份，同一纪律适用。
 - **成本**：L1 每步重发约 240 字符；L2 每条用户消息约 110 字符。相对被替换掉的 419 字符一次性上下文行，是净增，但仍在噪声级。
 - **把委派提示词也要求成中文的代价（2026-09-23 追加）**：`subagent` 若路由到 `claude-code` / `codex` 这类外部代理，中文任务书可能**降低其执行准确度**；本仓库只把语言要求交给模型，不评估下游模型的语言能力。若日后发现下游执行质量下降，回退点是把 §12.2 从枚举里删掉——规则文本、测试与文档三处同步改即可。
-- **成本增额（2026-09-23 追加）**：L1 由约 240 增至约 1650 字符（每步重发），L2 由约 110 增至约 210 字符（每条用户消息）。相对被替换掉的 419 字符一次性上下文行，L1 已是**数倍净增**——这是为"工具字段必须本地化"付的可见代价，不再是噪声级，如实记录。
+- **成本增额（2026-09-23 追加）**：L1 由约 240 增至 **1102** 字符（每步重发），L2 由约 110 增至 **199** 字符（每条用户消息）。相对被替换掉的 419 字符一次性上下文行，L1 已是**数倍净增**——这是为"工具字段必须本地化"付的可见代价，不再是噪声级，如实记录。
 - **强化措辞是实测驱动、且预留了回退**：首次端到端验收发现 `bash.description` 只有 `1/12` 用中文（重启前 `0/167`），而 `subagent.description`/`prompt` 为中文。据此在 L1 里加了独立强断言段（"hard requirement, not a preference… a tool's own schema documents its field in English; that documents the field, it does not license an English value"）。若强化后仍不达标，回退点是删掉该段、恢复 §12 首版措辞，并把"工具字段是概率性的"写进 README 已知边界。
 
 ## 11. 明确不做

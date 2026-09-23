@@ -68,7 +68,7 @@ Output-language directive: write every text you produce — your reasoning, your
 Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
 ```
 
-**代码、标识符、命令、路径、错误原文一律不翻译。**
+**代码、标识符、命令、路径、错误原文一律不翻译**（含工具名与 `workspace-write` 这类枚举值）。注意 L1 已从约 240 字符增长到 **1102** 字符（每步重发），这是「工具字段必须本地化」的可见代价，不再是噪声级。
 
 **范围含工具调用参数里的可见字段与交给另一个 agent 的提示词**（2026-09-23 追加）。规则点名的不只是叙述文本，还包括：`bash` / `pwsh` 的 `description`（调用树与终端卡片直接渲染它，见 `dsh-client-ui-tool/lib/client.js:883`）、`present` 的 `files[].description`、沙箱越权的 `justification`（`dsh-sandbox/lib/index.js:102` 把它拼进审批弹窗的 `reason`）、`subagent` 的 `description`、`todo_write` 的 `content`，以及 `subagent` / `subagent_fork` / `workflow` / `ralph` 的提示词正文。**不译的例外**：`command`、`file_path`、`query`/`pattern`、`url`、工具名与枚举值，以及 harness 写死的字符串（例如审批弹窗那半句 `escalate sandbox to workspace-write:`）。证据清单见 v2 spec §12。
 
