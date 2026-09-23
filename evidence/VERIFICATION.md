@@ -620,3 +620,72 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
 - `deriveMessages()` 会包含已注入的 plugin user 消息，是从 harness 的 surface 契约与既有会话转录
   （注入确被模型看见）推得，**未**用独立探针直接打印一次 `deriveMessages()` 的内容。
 
+
+## 2026-09-23 输出语言 v2（system 段 + 每轮提醒）
+
+**触发**：takisy 工作区会话 `session-d0c635f9-875d-4dc4-934d-fda5a2f3bbec`（`engineering`、界面 `zh`、用户全程中文、2 轮 18 步）的实测——v1 的语言行与 `8843205` 扩写的覆盖句**都已生效**（运行时上下文含 `your reasoning, your progress notes between tool calls`；bootstrap 注入 `1` 次），但思考仍是英文。
+
+| 指标 | 实测 |
+|---|---|
+| 思考流 CJK（原始 / 剥引用后） | `6928/63609 = 10.9%` / `2097/56942 = 3.7%` |
+| 思考块首词语言 | `18/18` 英文 |
+| 第 1 轮 / 第 2 轮思考 CJK（剥引用后） | `0.19%` / `7.5%` |
+| 可见正文 CJK | `1567/4206 = 37.3%` |
+| bootstrap 注入次数 | `1`（幂等修复生效） |
+
+原始 `10.9%` 是假象：那些 CJK 字符几乎全是被引用的中文原文、`AGENTS.md` 片段与 `中文摘要` 这类术语。
+
+**诊断**：规则投递在 user 角色的历史消息里（`source.kind: "plugin"`、`form: "snapshot"`、`systemPromptUpdate: "in-history"`），而 system 消息 `8514` 字符里只有 `9` 个 CJK 字符、完全没提语言；规则之后紧跟 `3593` 字符英文 skill 目录与 `11662` 字符英文 bootstrap。按来源分类的 CJK 比例：system 消息 `0.11%`、bootstrap `0.07%`、skill 目录 `0%`、工具 schema 全英文，而 `AGENTS.md` `52.3%`、真实用户消息 `60.9%`。
+
+**设计**：`docs/superpowers/specs/2026-09-23-output-language-v2-design.md`（实施计划 `docs/superpowers/plans/2026-09-23-output-language-v2.md`）。
+
+**架构性未知的关闭方式（2026-09-23，未跑运行时探针）**：原计划的第一步是起一条真会话实证 `systemPrompt.section()` 在 preset realm 可调用（v2 spec §3 约束 1 把它列为设计唯一的架构性未知）。实施时改用三条代码级证据，因此**没有**会话转录可贴：
+
+1. **harness 自己的加载器文档**（`@deepseek-ai/dsh-agent-presets/lib/index.js` 的 `mount` 模块）逐字写着：entry contexts chain to the context the subtree was plugged into, so every `ctx.tools` and `ctx.systemPrompt` registration inside the preset files into **that agent's layer** and unwinds with it。
+2. **该方法确实存在**：运行时内省 `@deepseek-ai/dsh-system-prompt` 的 `SystemPrompt.prototype`，输出为
+
+```
+SystemPrompt 类存在: true
+原型方法 section : function
+原型方法 context : function
+原型方法 getSectionOrder: function
+原型成员: section, getSectionOrder, getContextOrder, context, suppressRuntimeContext, tools, variable, assemble
+section 与 context 同源同类: true
+```
+
+   即**不存在"有 `context` 没有 `section`"的宿主版本**。
+3. **该 realm 确实能拿到这个服务**：v1 的 `context()` 已实测在该 realm 跑通（那条语言行进了会话 `session-d0c635f9` 的运行时上下文），而同一次 `inject(['systemPrompt'])` 给的就是同一个 `scope.systemPrompt` 对象。
+
+原计划的探针插件（`preset/plugins/section-probe/`、组合行与自测）因此在落地前撤销，未进入任何提交。**仍未观察到的只剩一个观测量**：新 L1 文本出现在渲染后的 system 消息里、且位于 persona 之前——由本节末尾的端到端实测覆盖。
+
+**单测与守卫**：
+
+```
+$ npm test
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 280.503002
+```
+
+插件自测（`node preset/plugins/output-language/output-language.test.mjs`）覆盖 14 组断言：两条渲染函数的四态整行 golden、非法输入兜底、`resolveLanguageTag` 的四类不可读路径与 warnOnce、section 注册形状（`order: -1`、**零条 context**）、动态重读、`section()` 缺失时的降级、以及 pre-step 的七种批次形状。preset 层守卫（`scripts/output-language.test.mjs`）改读 v2 spec §6 并断言 v1 的 `renderLanguageContext` **不存在**（防留别名）。
+
+**组合健康检查**：
+
+```
+$ node scripts/verify-composition.mjs
+roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
+2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
+```
+
+**落地过程中修正的一处测试缺陷**：自包含断言原为 `!source.includes('@deepseek-ai/')`，而新源码的 JSDoc 里合法地写着 "must not import any `@deepseek-ai/*` package"，于是把文档文字判成了导入。改为匹配真正的导入语法 `/(?:from|import)\s*\(?\s*['"]@deepseek-ai\//`（要求带引号说明符），**语义严格更强**，不是放宽。
+
+### 未验证（诚实清单）
+
+- **生效后的真实会话尚未观察**：需要人类重启宿主后新建会话跑一条中文多轮任务，按 v2 spec §9 的三条指标判定——思考流剥引用后 CJK ≥ 50%、可见正文 CJK ≥ 50%、每条消息首个思考块为中文。达标与否以实测为准；**不达标如实记失败，不修改门槛**。
+- 界面 `en` 的热切换场景未跑。
+- 子代理场景未跑。
