@@ -22,9 +22,12 @@ import { fileURLToPath } from 'node:url'
 
 import {
   LANGUAGE_TAG,
+  REMINDER_VERBATIM,
   SECTION_NAME,
   SECTION_ORDER,
   apply,
+  createUserMessage,
+  hasHumanMessage,
   name,
   renderLanguageDirective,
   renderLanguageReminder,
@@ -252,6 +255,102 @@ assert.match(
   noSectionWarnings[0],
   /output-language: systemPrompt\.section\(\) unavailable/,
   'the warning names the lost capability',
+)
+
+// 13. The pre-step listener appends exactly one reminder after the human
+//     message it is answering, and stays silent on every other batch shape.
+const listeners = []
+const reminderSettings = { preference: 'zh' }
+const reminderCtx = {
+  get: () => ({ get: () => reminderSettings }),
+  inject: (services, callback) => callback({ systemPrompt: { section: () => {}, context: () => {} } }),
+  on(event, listener) {
+    listeners.push({ event, listener })
+    return () => {}
+  },
+  logger: { warn: () => {} },
+}
+apply(reminderCtx)
+assert.equal(listeners.length, 1, 'installs exactly one pre-step listener')
+assert.equal(listeners[0].event, 'agent/pre-step', 'listens on agent/pre-step')
+
+const reminderListener = listeners[0].listener
+const textOf = (message) =>
+  message.content.filter((block) => block.type === 'text').map((block) => block.text).join('')
+
+async function preStep({ messages, kind = 'enter', aborted = false }) {
+  return reminderListener({ signal: { aborted } }, async () => ({ kind, messages }))
+}
+
+const humanMessage = createUserMessage({
+  content: [{ type: 'text', text: '审查一下agents.md' }],
+  source: { kind: 'user' },
+})
+const engineMessage = createUserMessage({
+  content: [{ type: 'text', text: 'Current runtime context. This snapshot supersedes …' }],
+  source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+})
+
+// 13a. A step answering the human gets the reminder appended after the batch.
+const answered = await preStep({ messages: [humanMessage] })
+assert.equal(answered.kind, 'enter')
+assert.equal(answered.messages.length, 2, 'reminder appended after the claimed message')
+assert.equal(answered.messages[0], humanMessage, 'the claimed message still leads the batch')
+assert.equal(answered.messages[1].role, 'user', 'reminder is user-role')
+assert.equal(answered.messages[1].source.plugin, name, 'reminder source names this plugin')
+assert.equal(answered.messages[1].source.kind, 'plugin', 'reminder source is plugin-owned')
+assert.equal(textOf(answered.messages[1]), REMINDER.zh, 'reminder renders the live setting')
+assert.ok(Object.isFrozen(answered.messages[1]), 'the injected message is frozen')
+assert.notEqual(answered.messages[1].id, humanMessage.id, 'reminder gets a fresh identity')
+
+// 13b. THE POINT OF L2: the reminder follows EVERY human message, not the first
+//      one. A history-based dedup would inject once per session and lose the
+//      recency anchor this layer exists for.
+const again = await preStep({
+  messages: [createUserMessage({ content: [{ type: 'text', text: '继续' }], source: { kind: 'user' } })],
+})
+assert.equal(again.messages.length, 2, 'a second human message gets its own reminder')
+
+// 13c. Batches with no human message are left alone: maintenance steps, pure
+//      tool continuations, and the bootstrap's own injection.
+const engineOnly = await preStep({ messages: [engineMessage] })
+assert.equal(engineOnly.messages.length, 1, 'a plugin-only batch is untouched')
+const empty = await preStep({ messages: [] })
+assert.equal(empty.messages.length, 0, 'an empty batch is untouched')
+
+// 13d. A human message with no text block does not count.
+const imageless = createUserMessage({ content: [], source: { kind: 'user' } })
+const noText = await preStep({ messages: [imageless] })
+assert.equal(noText.messages.length, 1, 'a text-less human message is not a language cue')
+
+// 13e. Rejected and aborted steps are untouched.
+const rejected = await preStep({ messages: [humanMessage], kind: 'reject' })
+assert.equal(rejected.kind, 'reject')
+assert.equal(rejected.messages.length, 1, 'a rejected step is untouched')
+const aborted = await preStep({ messages: [humanMessage], aborted: true })
+assert.equal(aborted.messages.length, 1, 'an aborted step is untouched')
+
+// 13f. A batch where the human message is not last still gets the reminder
+//      appended at the end (the harness appends injected messages).
+const mixed = await preStep({ messages: [engineMessage, humanMessage] })
+assert.equal(mixed.messages.length, 3, 'reminder appended at the end of the batch')
+assert.equal(textOf(mixed.messages[2]), REMINDER.zh, 'reminder is last')
+
+// 13g. The reminder is dynamic too: a settings change applies to the next one.
+reminderSettings.preference = 'en'
+const inEnglish = await preStep({ messages: [humanMessage] })
+assert.equal(textOf(inEnglish.messages[1]), REMINDER.en, 'the reminder re-reads the setting')
+
+// 14. `hasHumanMessage` is the whole condition, so pin it directly.
+assert.equal(hasHumanMessage([humanMessage]), true, 'a human text message counts')
+assert.equal(hasHumanMessage([engineMessage]), false, 'a plugin message does not')
+assert.equal(hasHumanMessage([]), false, 'an empty batch does not')
+assert.equal(hasHumanMessage(undefined), false, 'a missing batch does not')
+assert.equal(hasHumanMessage('nope'), false, 'a non-array does not')
+assert.equal(
+  hasHumanMessage([createUserMessage({ content: [{ type: 'text', text: '' }], source: { kind: 'user' } })]),
+  false,
+  'an empty text block does not count',
 )
 
 console.log('selftest OK: output-language')
