@@ -21,6 +21,7 @@
 - **不改** `preset/bootstrap.md`、`scripts/build-bootstrap.sh`、persona `prefix`/`suffix`、`preset/plugins/bootstrap/index.js`、`preset/plugins/caveman-command/index.js`。
 - **提交信息格式**：`<type>(<scope>): 中文摘要`；本仓库近期提交无 AI 披露尾行，照此执行。
 - **每个任务结束都要提交**，且每个任务的验证命令必须真实跑过、贴真实输出。
+- **本计划不含探针、也不需要为探针重启宿主**：`systemPrompt.section()` 在 preset realm 的可调用性已由三条代码级证据关闭（见 Task 5 的 evidence 一节与 v2 spec §3 约束 1）。唯一需要重启宿主的是最后的端到端实测（Task 6），那一步本来就要在新会话里跑。
 
 ## File Structure
 
@@ -29,7 +30,6 @@
 | `preset/plugins/output-language/index.js` | 语言插件的全部逻辑：标签解析、两段渲染、section 注册、pre-step 注入 | 重写 |
 | `preset/plugins/output-language/output-language.test.mjs` | 插件的无框架自测（渲染 golden、注册形状、注入行为、自包含扫描） | 重写 |
 | `preset/plugins/output-language/package.json` | 插件包元数据 | 只改 `description` |
-| `preset/plugins/section-probe/` | **临时**探针插件，只存在于 Task 1，Task 2 删除 | 新增后删除 |
 | `scripts/output-language.test.mjs` | preset 层守卫：组合挂载行、导出面、README 冻结行、v2 spec §6 交叉校验 | 重写守卫体 |
 | `preset/agent.cordis.yml` | 组合：把 `output-language` 行接上 | 只改该行注释 |
 | `README.md` | 面向人的事实：行为表、注入文本、生效边界、目录树、测试清单 | 改「输出语言」节与相关计数 |
@@ -38,226 +38,7 @@
 
 ---
 
-### Task 1: 探针 —— 实证 `systemPrompt.section()` 在 preset realm 可调用
-
-这是 v2 spec §3 约束 1 记录的唯一架构性未知。它必须**先于任何实现**取证：若不可调用，L1 的设计要整体回炉（唯一备选是把文本并进 persona `prefix`，代价是语言冻结成启动快照）。**不得**用 §8 那条 try/catch 静默降级——那条守的是"未来宿主移除 section API"，不是"当前宿主不支持"。
-
-**Files:**
-- Create: `preset/plugins/section-probe/index.js`
-- Create: `preset/plugins/section-probe/package.json`
-- Create: `preset/plugins/section-probe/section-probe.test.mjs`
-
-**Interfaces:**
-- Consumes: 无（本任务不依赖前面任何任务）
-- Produces: 一个**结论**（可调用 / 不可调用）与一条**证据**（会话 system 消息里的探针行原文）。Task 3 直接依赖这个结论；探针插件本身在 Task 2 被删除，不向后传递任何代码接口。
-
-- [ ] **Step 1: 写探针插件**
-
-创建 `preset/plugins/section-probe/index.js`：
-
-```js
-/**
- * TEMPORARY architectural probe — deleted in Task 2.
- *
- * The one unknown v2 depends on: can a preset-realm plugin register a
- * `systemPrompt` SECTION (not merely a runtime context)? The v1 plugin proved
- * `context()` works from this realm; `section()` has only circumstantial
- * evidence (same `layers.effect` registration path in dsh-system-prompt). This
- * probe turns that inference into an observation.
- *
- * It deliberately registers BOTH a section and a context: the section text is
- * the thing under test, and the context text is the control — if the context
- * shows up in the session transcript but the section does not, the failure is
- * specific to `section()`, not to reaching the prompt at all.
- *
- * Self-contained like every preset-local plugin: no `@deepseek-ai/*` import.
- *
- * @module dsh-section-probe
- */
-
-/** Cordis plugin name. */
-const name = 'section-probe'
-
-/** The line the probe adds to the SYSTEM prompt when `section()` works. */
-const SECTION_TEXT = 'SECTION-PROBE-ALPHA: section registration works'
-
-/** The line the probe adds to the runtime CONTEXT as a control. */
-const CONTEXT_TEXT = 'CONTEXT-PROBE-BETA: context registration works'
-
-/**
- * Register the probe section and its control context.
- *
- * @param ctx - the mounting agent-scope context.
- */
-function apply(ctx) {
-  ctx.inject(['systemPrompt'], (scope) => {
-    try {
-      scope.systemPrompt.section({
-        name: 'section-probe',
-        order: -1,
-        text: SECTION_TEXT,
-      })
-    } catch (error) {
-      ctx.logger?.warn?.(`${name}: section() failed: ${String(error)}`)
-    }
-    try {
-      scope.systemPrompt.context({
-        name: 'section-probe-control',
-        order: 104,
-        text: CONTEXT_TEXT,
-      })
-    } catch (error) {
-      ctx.logger?.warn?.(`${name}: context() failed: ${String(error)}`)
-    }
-  })
-}
-
-export { CONTEXT_TEXT, SECTION_TEXT, apply, name }
-```
-
-创建 `preset/plugins/section-probe/package.json`：
-
-```json
-{
-  "name": "dsh-section-probe",
-  "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "description": "TEMPORARY probe: proves systemPrompt.section() is callable from a preset realm.",
-  "main": "index.js",
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.2"
-  }
-}
-```
-
-- [ ] **Step 2: 写探针自测（`scripts/install.sh` 的门禁要求每个插件目录有同名自测，缺则中止安装）**
-
-创建 `preset/plugins/section-probe/section-probe.test.mjs`：
-
-```js
-/**
- * Self-test for the temporary section probe (deleted with it in Task 2).
- *
- * It checks the registration SHAPE only: a real call proves nothing about the
- * harness, so the live observation is Step 5's session. This test exists so the
- * install gate has something to run, and so a typo in the probe cannot be
- * mistaken for a negative architectural result.
- *
- * Usage: node preset/plugins/section-probe/section-probe.test.mjs   (or: npm test)
- */
-
-import { strict as assert } from 'node:assert'
-
-import { CONTEXT_TEXT, SECTION_TEXT, apply, name } from './index.js'
-
-const injected = []
-let sectionCalls = []
-let contextCalls = []
-const fakeCtx = {
-  inject(services, callback) {
-    injected.push(services)
-    callback({
-      systemPrompt: {
-        section: (entry) => sectionCalls.push(entry),
-        context: (entry) => contextCalls.push(entry),
-      },
-    })
-  },
-  logger: { warn: () => {} },
-}
-
-apply(fakeCtx)
-
-assert.equal(name, 'section-probe', 'plugin name')
-assert.deepEqual(injected, [['systemPrompt']], 'injects the systemPrompt service')
-assert.equal(sectionCalls.length, 1, 'registers exactly one section')
-assert.equal(sectionCalls[0].name, 'section-probe', 'section name')
-assert.equal(sectionCalls[0].order, -1, 'section order sits between identity (-1000) and persona (0)')
-assert.equal(sectionCalls[0].text, SECTION_TEXT, 'section text is the probe line')
-assert.equal(contextCalls.length, 1, 'registers exactly one control context')
-assert.equal(contextCalls[0].name, 'section-probe-control', 'control context name')
-assert.equal(contextCalls[0].order, 104, 'control context order')
-assert.equal(contextCalls[0].text, CONTEXT_TEXT, 'control context text is the control line')
-
-console.log('selftest OK: section-probe')
-```
-
-- [ ] **Step 3: 把探针接进组合，跑安装门禁**
-
-在 `preset/agent.cordis.yml` 的 `output-language` 行**之后**插入：
-
-```yaml
-# TEMPORARY（Task 1）：实证 systemPrompt.section() 在 preset realm 可调用。
-# 取证后立即删除本行与 preset/plugins/section-probe/。
-- id: section-probe
-  name: './plugins/section-probe/index.js'
-```
-
-Run:
-
-```sh
-cd /home/goalizc/dsh-engineering
-npm test
-bash scripts/install.sh
-```
-
-Expected: `npm test` 的插件自测数与总数各 +1 条（探针自测被 glob 收集），其余全绿；`install.sh` 打印 `self-test: section-probe OK` 且 `self-tests: 4 plugin(s) OK`。
-
-- [ ] **Step 4: 跑组合健康检查（不需要重启宿主）**
-
-Run:
-
-```sh
-cd /home/goalizc/dsh-engineering && node scripts/verify-composition.mjs
-```
-
-Expected: 打印 `engineering` 这一行为可加载（`broken: null`）——即探针的 preset 相对行、`!!js`、技能目录与 realm 全部合法。**把真实输出贴进本次提交的正文。**
-
-- [ ] **Step 5: 人类重启宿主后新建会话取证（这是本任务的全部意义）**
-
-这一步**必须由人类完成**：运行中的 host 进程缓存 preset 插件模块，只新建会话不够。
-
-1. 人类重启 `dsh web`；
-2. 新建会话、选「工程模式」；
-3. 发任意一句话（例如「探针」）。
-
-判据：读该会话的转录，看**第 8 类消息**（`type: "system/message"`）的文本。
-
-- **PASS**：system 消息里出现 `SECTION-PROBE-ALPHA`，且它**位于** persona 段落（`You are a coding agent powered by …`）**之前**。同时运行时上下文里应出现 `CONTEXT-PROBE-BETA`（对照）。
-- **FAIL**：system 消息里没有 `SECTION-PROBE-ALPHA`，但运行时上下文里有 `CONTEXT-PROBE-BETA` → `section()` 在 preset realm 不可调用。**停下**，回来改 v2 spec §5（备选：把文本并进 persona `prefix`），不要继续 Task 2。
-- **FAIL（另一种）**：两者都没有 → 探针插件根本没挂载，先查 `verify-composition.mjs` 与宿主日志。
-
-读转录的命令（把 `<会话目录>` 换成实际路径）：
-
-```sh
-zstdcat ~/.dsh/sessions/<工作区目录编码>/<会话目录>/session.v3.jsonl.zstd \
-  | python3 -c 'import json,sys
-for line in sys.stdin:
-    d=json.loads(line)
-    if d.get("type")=="system/message":
-        t=d["data"]["message"]["content"][0]["text"]
-        print("SECTION-PROBE-ALPHA:", "SECTION-PROBE-ALPHA" in t)
-        print("CONTEXT-PROBE-BETA:", "CONTEXT-PROBE-BETA" in t)
-        i=t.find("SECTION-PROBE-ALPHA"); j=t.find("You are a coding agent")
-        print("section 在 persona 之前:", i!=-1 and i<j)'
-```
-
-- [ ] **Step 6: 把取证结果写进提交信息**
-
-Run:
-
-```sh
-cd /home/goalizc/dsh-engineering
-git add preset/plugins/section-probe preset/agent.cordis.yml
-git commit -m "test: 临时探针实证 systemPrompt.section() 在 preset realm 可调用（取证：system 消息含 SECTION-PROBE-ALPHA 且先于 persona）"
-```
-
-Expected: 提交成功；若探针为 FAIL，则**不提交**，回到 v2 spec 改设计。
-
----
-
-### Task 2: 重写渲染纯函数（TDD）
+### Task 1: 重写渲染纯函数（TDD）
 
 把 v1 的四段拼装（规则句 + 界面语言子句 + 覆盖句 + 固定尾句）换成 v2 的两条独立模板，并在同一次重写里清掉 v1 的导出面，免得留下"看起来还生效"的死代码。
 
@@ -265,11 +46,10 @@ Expected: 提交成功；若探针为 FAIL，则**不提交**，回到 v2 spec �
 - Modify: `preset/plugins/output-language/index.js`（整文件重写）
 - Modify: `preset/plugins/output-language/output-language.test.mjs`（整文件重写）
 - Modify: `preset/plugins/output-language/package.json`（`description`）
-- Delete: `preset/plugins/section-probe/` 与 `preset/agent.cordis.yml` 里的探针行
 
 **Interfaces:**
-- Consumes: Task 1 的结论（`section()` 可调用）。
-- Produces（Task 3、Task 4、Task 5 依赖这些确切的导出）：
+- Consumes: 无（本任务不依赖任何前置任务的代码；`section()` 可调用的证据已由 spec §3 约束 1 关闭）。
+- Produces（Task 2、Task 3、Task 4 依赖这些确切的导出）：
   - `name: 'output-language'`
   - `LANGUAGE_TAG: RegExp`
   - `LANGUAGE_NAMES: { zh: '中文', en: 'English' }`
@@ -467,7 +247,7 @@ assert.ok(!source.includes('@deepseek-ai/'), 'plugin must not import harness pac
 console.log('selftest OK: output-language (renderers)')
 ```
 
-（本步骤只放渲染相关的断言；注册与注入的断言在 Task 3、Task 4 追加到本文件末尾。删掉本文件的 `console.log` 之前的部分只在上面这一处，追加时保持单一 `console.log` 收尾。）
+（本步骤只放渲染相关的断言；注册与注入的断言在 Task 2、Task 3 追加到本文件末尾。删掉本文件的 `console.log` 之前的部分只在上面这一处，追加时保持单一 `console.log` 收尾。）
 
 - [ ] **Step 2: 跑测试确认失败**
 
@@ -770,13 +550,7 @@ cd /home/goalizc/dsh-engineering && node preset/plugins/output-language/output-l
 
 Expected: PASS，最后一行 `selftest OK: output-language (renderers)`。若某条 golden 不等，**不要改 golden**——改实现去匹配 v2 spec §6 的逐字文本。
 
-- [ ] **Step 5: 删除探针（Task 1 的临时件到此为止）**
-
-```sh
-cd /home/goalizc/dsh-engineering
-rm -rf preset/plugins/section-probe
-# 从 preset/agent.cordis.yml 删除 Task 1 Step 3 插入的注释行与 - id: section-probe 两行
-```
+- [ ] **Step 5: 跑组合健康检查**
 
 Run:
 
@@ -784,27 +558,27 @@ Run:
 cd /home/goalizc/dsh-engineering && node scripts/verify-composition.mjs
 ```
 
-Expected: 仍打印 `engineering` 可加载（`broken: null`）。探针目录若残留，安装门禁会继续跑它的自测——所以这一步必须真的删掉。
+Expected: 打印 `engineering` 可加载（`broken: null`）。
 
 - [ ] **Step 6: 提交**
 
 ```sh
 cd /home/goalizc/dsh-engineering
-git add preset/plugins/output-language/index.js preset/plugins/output-language/output-language.test.mjs preset/plugins/output-language/package.json preset/agent.cordis.yml
-git commit -m "feat: 输出语言 v2 渲染层（system 段文本 + 每轮提醒文本，中文兜底）并移除探针"
+git add preset/plugins/output-language/index.js preset/plugins/output-language/output-language.test.mjs preset/plugins/output-language/package.json
+git commit -m "feat: 输出语言 v2 渲染层（system 段文本 + 每轮提醒文本，中文兜底）"
 ```
 
 ---
 
-### Task 3: 注册 L1 system 段，删除 v1 上下文行
+### Task 2: 注册 L1 system 段，删除 v1 上下文行
 
 **Files:**
 - Modify: `preset/plugins/output-language/output-language.test.mjs`（追加"注册形状"断言组）
 - Modify: `preset/agent.cordis.yml`（只改 `output-language` 行的注释）
 
 **Interfaces:**
-- Consumes: Task 2 的 `apply`、`renderLanguageDirective`、`resolveLanguageTag`、`SECTION_NAME`、`SECTION_ORDER`。
-- Produces: `apply(ctx)` 注册**恰好一条** system section 且**零条** context —— Task 5 的守卫会断言组合行仍指向本插件；Task 4 在同一次 `apply` 里追加 L2。
+- Consumes: Task 1 的 `apply`、`renderLanguageDirective`、`resolveLanguageTag`、`SECTION_NAME`、`SECTION_ORDER`。
+- Produces: `apply(ctx)` 注册**恰好一条** system section 且**零条** context —— Task 4 的守卫会断言组合行仍指向本插件；Task 3 在同一次 `apply` 里追加 L2。
 
 - [ ] **Step 1: 追加失败的测试**
 
@@ -902,7 +676,7 @@ Expected: FAIL —— `SyntaxError: The requested module './index.js' does not p
 
 - [ ] **Step 3: 实现**
 
-Task 2 的 `index.js` 已包含 L1 的 `section()` 注册与 try/catch。本步只做一件事：把这两个名字加进导出表（Task 2 的导出表已含 `SECTION_NAME`、`SECTION_ORDER`；若上一步跑测试时发现缺了，就在 `export { … }` 里补上）。用编辑工具确认导出表包含：
+Task 1 的 `index.js` 已包含 L1 的 `section()` 注册与 try/catch。本步只做一件事：把这两个名字加进导出表（Task 1 的导出表已含 `SECTION_NAME`、`SECTION_ORDER`；若上一步跑测试时发现缺了，就在 `export { … }` 里补上）。用编辑工具确认导出表包含：
 
 ```js
 export {
@@ -966,13 +740,13 @@ git commit -m "feat: 语言规则升级为 system-prompt 段（order -1），删
 
 ---
 
-### Task 4: L2 —— 每条用户消息后的提醒注入
+### Task 3: L2 —— 每条用户消息后的提醒注入
 
 **Files:**
 - Modify: `preset/plugins/output-language/output-language.test.mjs`（追加"注入行为"断言组）
 
 **Interfaces:**
-- Consumes: Task 2 的 `createUserMessage`、`hasHumanMessage`、`renderLanguageReminder`、`REMINDER_VERBATIM`；Task 3 的 `apply`（L2 已装在其中）。
+- Consumes: Task 1 的 `createUserMessage`、`hasHumanMessage`、`renderLanguageReminder`、`REMINDER_VERBATIM`；Task 2 的 `apply`（L2 已装在其中）。
 - Produces: 一条 `agent/pre-step` 监听器。行为契约（README 与 evidence 会引用）：**每个 claim 到人类消息的步，追加恰好一条 `source.plugin === 'output-language'` 的 user 消息**；无人类消息、`reject`、`aborted` 三种情况不追加。
 
 - [ ] **Step 1: 追加失败的测试**
@@ -1105,11 +879,11 @@ Run:
 cd /home/goalizc/dsh-engineering && node preset/plugins/output-language/output-language.test.mjs
 ```
 
-Expected: FAIL —— `SyntaxError: The requested module './index.js' does not provide an export named 'hasHumanMessage'`（若 Task 2 已导出全部名字，则失败点是 `assert.equal(listeners.length, 1)` → 得到 0：`apply` 还没挂监听器）。
+Expected: FAIL —— `SyntaxError: The requested module './index.js' does not provide an export named 'hasHumanMessage'`（若 Task 1 已导出全部名字，则失败点是 `assert.equal(listeners.length, 1)` → 得到 0：`apply` 还没挂监听器）。
 
 - [ ] **Step 3: 实现**
 
-Task 2 的 `index.js` 已包含 `hasHumanMessage`、`createUserMessage` 与 `ctx.on('agent/pre-step', …)` 的完整实现与导出。本步是**确认**而非重写：核对 `apply` 内监听器与下面逐字一致（缺哪段补哪段，不要另写一套）：
+Task 1 的 `index.js` 已包含 `hasHumanMessage`、`createUserMessage` 与 `ctx.on('agent/pre-step', …)` 的完整实现与导出。本步是**确认**而非重写：核对 `apply` 内监听器与下面逐字一致（缺哪段补哪段，不要另写一套）：
 
 ```js
   ctx.on('agent/pre-step', async ({ signal }, next) => {
@@ -1146,7 +920,7 @@ git commit -m "feat: 每条用户消息后注入语言提醒（判据是本步 c
 
 ---
 
-### Task 5: preset 层守卫改读 v2 spec
+### Task 4: preset 层守卫改读 v2 spec
 
 `scripts/output-language.test.mjs` 现在断言的是 v1 的冻结文本与旧导出面，**必须先看到它红**，再把它改到 v2。这也是"两个 spec 都声称自己是冻结源"的防线：本任务把跨校验源钉死在 v2 文件上。
 
@@ -1154,7 +928,7 @@ git commit -m "feat: 每条用户消息后注入语言提醒（判据是本步 c
 - Modify: `scripts/output-language.test.mjs`（整文件替换）
 
 **Interfaces:**
-- Consumes: Task 2 的 `renderLanguageDirective` / `renderLanguageReminder`；v2 spec §6 的八行冻结文本。
+- Consumes: Task 1 的 `renderLanguageDirective` / `renderLanguageReminder`；v2 spec §6 的八行冻结文本。
 - Produces: 三条守卫（组合挂载行 / v2 spec §6 交叉校验 / README 冻结行）—— 后续任何文本改动漏改任一处即红。
 
 - [ ] **Step 1: 跑现有守卫，确认它确实红**
@@ -1322,13 +1096,13 @@ cd /home/goalizc/dsh-engineering && node --test scripts/output-language.test.mjs
 
 Expected: 3 个 test 全 PASS、0 fail。
 
-**注意**：本步会失败在 `the README publishes both zh lines verbatim` —— 这是**预期内的红**，README 在 Task 6 才更新。此时可以先只跑前两个 test：
+**注意**：本步会失败在 `the README publishes both zh lines verbatim` —— 这是**预期内的红**，README 在 Task 5 才更新。此时可以先只跑前两个 test：
 
 ```sh
 cd /home/goalizc/dsh-engineering && node --test --test-name-pattern="composition|module exports|spec section 6" scripts/output-language.test.mjs
 ```
 
-Expected: 3 pass / 0 fail。README 那条留到 Task 6 Step 4 转绿。
+Expected: 3 pass / 0 fail。README 那条留到 Task 5 Step 4 转绿。
 
 - [ ] **Step 4: 提交**
 
@@ -1338,19 +1112,19 @@ git add scripts/output-language.test.mjs
 git commit -m "test: 输出语言守卫改读 v2 spec §6，断言导出面与冻结行"
 ```
 
-（本次提交故意让 README 守卫红着——它由 Task 6 关闭。提交信息里写明这一点。）
+（本次提交故意让 README 守卫红着——它由 Task 5 关闭。提交信息里写明这一点。）
 
 ---
 
-### Task 6: README 与证据文档
+### Task 5: README 与证据文档
 
 **Files:**
 - Modify: `README.md`（「输出语言」节、顶部插件枚举、目录树注释）
 - Modify: `evidence/VERIFICATION.md`（追加 2026-09-23 一节）
 
 **Interfaces:**
-- Consumes: Task 2 的两个渲染函数输出、Task 4 的注入行为契约、Task 1 的探针取证结果。
-- Produces: Task 5 的第三条守卫转绿所需的 README 文本。
+- Consumes: Task 1 的两个渲染函数输出、Task 3 的注入行为契约、spec §3 约束 1 的代码级证据。
+- Produces: Task 4 的第三条守卫转绿所需的 README 文本。
 
 - [ ] **Step 1: 改写 README「输出语言」节**
 
@@ -1414,9 +1188,7 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 
 - [ ] **Step 3: 追加 `evidence/VERIFICATION.md` 一节**
 
-在文件末尾追加（把 `<探针输出>`、`<npm test 输出>`、`<组合检查输出>` 换成真实粘贴，不要凭记忆写）。
-
-`<探针输出>` 取 Task 1 那次取证的原文：探针插件在 Task 2 Step 5 已删除，唯一的持久证据是 Task 1 的提交正文与当时跑过的读取命令输出——从这里复制，**不要重跑**（重跑需要再删一次插件、再重启一次宿主）：
+在文件末尾追加（把 `<npm test 输出>`、`<组合检查输出>` 换成真实粘贴，不要凭记忆写）：
 
 ````markdown
 ## 2026-09-23 输出语言 v2（system 段 + 每轮提醒）
@@ -1435,11 +1207,13 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 
 **设计**：v2 spec `docs/superpowers/specs/2026-09-23-output-language-v2-design.md`。
 
-**探针（Task 1，实证 `systemPrompt.section()` 在 preset realm 可调用）**：
+**架构性未知的关闭方式（2026-09-23，未跑探针）**：原计划是起一条真会话实证 `systemPrompt.section()` 在 preset realm 可调用。实施时改用三条代码级证据，因此**没有**会话转录可贴：
 
-```
-<探针输出>
-```
+1. `@deepseek-ai/dsh-agent-presets/lib/index.js` 的 `mount` 模块注释：every `ctx.tools` and `ctx.systemPrompt` registration inside the preset files into that agent's layer and unwinds with it。
+2. 运行时内省 `@deepseek-ai/dsh-system-prompt` 的 `SystemPrompt.prototype`：`section` / `context` / `getSectionOrder` 同为 `function`，不存在只有 `context` 的宿主版本。
+3. v1 的 `context()` 已实测在该 realm 跑通（语言行进了真会话转录 `session-d0c635f9`），同一次 `inject(['systemPrompt'])` 给的是同一个 `scope.systemPrompt` 对象。
+
+仍未观察到的只剩观测量：新 L1 文本出现在渲染后的 system 消息里、且位于 persona 之前——它由 Task 6 的端到端实测覆盖。
 
 **单测与守卫**：
 
@@ -1480,15 +1254,15 @@ git commit -m "docs: 回填输出语言 v2（system 段 + 每轮提醒）的行�
 
 ---
 
-### Task 7: 端到端实测（人类执行，唯一真证据）
+### Task 6: 端到端实测（人类执行，唯一真证据）
 
-自动化到 Task 6 为止，第 1–2a 层全绿也只证明"文本与注册形状对"。本任务由人类执行，**任一条不过即不算完成**。
+自动化到 Task 1 为止，第 1–2a 层全绿也只证明"文本与注册形状对"。本任务由人类执行，**任一条不过即不算完成**。
 
 **Files:**
-- Modify: `evidence/VERIFICATION.md`（把 Task 6 Step 3 的"未验证清单"第一条改写成实测结果）
+- Modify: `evidence/VERIFICATION.md`（把 Task 1 Step 3 的"未验证清单"第一条改写成实测结果）
 
 **Interfaces:**
-- Consumes: Task 1–6 的全部产出（已安装的 preset）。
+- Consumes: Task 1–5 的全部产出（已安装的 preset）。
 - Produces: 需求的最终验收记录。
 
 - [ ] **Step 1: 重启宿主并重装 preset**
@@ -1576,22 +1350,22 @@ Expected: 提交成功，**无论达标与否**——不达标就如实写"未�
 
 | spec 节 | 落在哪个任务 |
 |---|---|
-| §3 约束 1（section 可调用性未知） | Task 1（探针，取证后 Task 2 删除） |
-| §4 语义决策（界面语言 + 中文兜底） | Task 2 Step 1 第 3、7 组断言 + Task 2 Step 3 的 `tagOrFallback` |
-| §5 L1（order -1、section、动态 provider） | Task 2 实现 + Task 3 Step 1 第 11 组断言 |
-| §5 L2（pre-step、判据是本步批次、消息形状） | Task 4 Step 1 第 13 组断言 + Task 2 实现的 `hasHumanMessage` |
-| §5 L3（删除 context） | Task 3 Step 1 的 `contextCalls.length === 0` |
-| §6 渲染规则与八行冻结 | Task 2 Step 1 golden + Task 5 spec 交叉校验 |
-| §7 数据流/时效（动态、无 per-request IO） | Task 3 Step 1 的动态重读断言 + Task 4 Step 1 第 13g 组 |
-| §8 失败模式（兜底中文、section 缺失降级、reject/abort 不注入） | Task 2 Step 1 第 3 组 + Task 3 Step 1 第 12 组 + Task 4 Step 1 第 13e 组 |
-| §9 测试与验证（探针/单测/守卫/端到端/命令） | Task 1、2、4、5、6、7 |
-| §9 端到端三条指标 | Task 7 Step 3 |
-| §10 风险（三份 `createUserMessage`、成本） | Global Constraints + Task 2 Step 3 的源码注释 |
+| §3 约束 1（section 可调用性） | 已用三条代码级证据关闭，无任务；证据写进 Task 5 的 evidence 一节 |
+| §4 语义决策（界面语言 + 中文兜底） | Task 1 Step 1 第 3、7 组断言 + Task 1 Step 3 的 `tagOrFallback` |
+| §5 L1（order -1、section、动态 provider） | Task 1 实现 + Task 1 Step 1 第 11 组断言 |
+| §5 L2（pre-step、判据是本步批次、消息形状） | Task 1 Step 1 第 13 组断言 + Task 1 实现的 `hasHumanMessage` |
+| §5 L3（删除 context） | Task 1 Step 1 的 `contextCalls.length === 0` |
+| §6 渲染规则与八行冻结 | Task 1 Step 1 golden + Task 1 spec 交叉校验 |
+| §7 数据流/时效（动态、无 per-request IO） | Task 1 Step 1 的动态重读断言 + Task 1 Step 1 第 13g 组 |
+| §8 失败模式（兜底中文、section 缺失降级、reject/abort 不注入） | Task 1 Step 1 第 3 组 + Task 1 Step 1 第 12 组 + Task 1 Step 1 第 13e 组 |
+| §9 测试与验证（单测/守卫/端到端/命令） | Task 1、3、4、5、6 |
+| §9 端到端三条指标 | Task 1 Step 3 |
+| §10 风险（三份 `createUserMessage`、成本） | Global Constraints + Task 1 Step 3 的源码注释 |
 | §11 明确不做（不改 bootstrap/persona/工具描述） | Global Constraints 的"不改"清单 |
-| §11 不删 v1 spec、冻结源唯一 | Task 5 的文件头注释 + v1 spec 里的取代指引（已在 spec 提交 `b55c217` 完成） |
+| §11 不删 v1 spec、冻结源唯一 | Task 1 的文件头注释 + v1 spec 里的取代指引（已在 spec 提交 `b55c217` 完成） |
 
 无缺口。
 
-**2. Placeholder scan**：计划中不出现 TBD/TODO/"自行补充"。`evidence/VERIFICATION.md` 一节里的 `<探针输出>`、`<npm test 输出>`、`<组合检查输出>` 是**证据占位**，由执行者在对应 Step 粘贴真实输出——这是如实记录的要求，不是设计缺口。Task 7 的 `<转录文件>` 是运行时路径参数，同前。
+**2. Placeholder scan**：计划中不出现 TBD/TODO/"自行补充"。`evidence/VERIFICATION.md` 一节里的 `<npm test 输出>`、`<组合检查输出>` 是**证据占位**，由执行者在对应 Step 粘贴真实输出——这是如实记录的要求，不是设计缺口。Task 6 的 `<转录文件>` 是运行时路径参数，同前。
 
-**3. Type consistency**：本计划使用的名字与签名在 Task 2 的导出表里一次性定义，后续任务只引用不重命名——`renderLanguageDirective(tag)`、`renderLanguageReminder(tag)`、`resolveLanguageTag(ctx)`、`hasHumanMessage(messages)`、`createUserMessage(input)`、`apply(ctx)`、`SECTION_NAME`、`SECTION_ORDER`、`LANGUAGE_TAG`、`LANGUAGE_NAMES`、`FALLBACK_TAG`、`REMINDER_VERBATIM`。Task 3 与 Task 4 的 import 列表与 Task 2 的导出表逐字一致；`renderLanguageContext`（v1 名）在 Task 2 被删除，Task 5 的守卫显式断言它不存在，防止留成别名。
+**3. Type consistency**：本计划使用的名字与签名在 Task 1 的导出表里一次性定义，后续任务只引用不重命名——`renderLanguageDirective(tag)`、`renderLanguageReminder(tag)`、`resolveLanguageTag(ctx)`、`hasHumanMessage(messages)`、`createUserMessage(input)`、`apply(ctx)`、`SECTION_NAME`、`SECTION_ORDER`、`LANGUAGE_TAG`、`LANGUAGE_NAMES`、`FALLBACK_TAG`、`REMINDER_VERBATIM`。Task 1 与 Task 1 的 import 列表与 Task 1 的导出表逐字一致；`renderLanguageContext`（v1 名）在 Task 1 被删除，Task 1 的守卫显式断言它不存在，防止留成别名。

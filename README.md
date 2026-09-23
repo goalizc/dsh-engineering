@@ -19,7 +19,7 @@
 | Caveman 默认 `full` 与流程产物优先级 | 同上，注入 `bootstrap.md` 的 "Caveman output style" 一节 |
 | Caveman 级别定义 | **技能**保留在 catalog，按需加载 |
 | **任务分档**（按规模缩放流程） | 注入 `bootstrap.md` 的 "Task sizing (harness override)" 一节，覆盖上游的无条件表述 |
-| **输出语言跟随界面语言** | 插件 `preset/plugins/output-language` 注册一条动态运行时上下文行，读 host 设置 `locale.preference`（界面 `zh` 默认中文、`en` 默认英文；用户换语言时跟随用户；覆盖回复、思考与工具间隙旁白、流程产物） |
+| **输出语言跟随界面语言** | 插件 `preset/plugins/output-language` 注册一条 `order: -1` 的 system-prompt 段（每步重发）与一条每条用户消息后的提醒，读 host 设置 `locale.preference`（界面 `zh` 默认中文、`en` 默认英文，读不到兜底中文；覆盖思考、回复、过程旁白与流程产物） |
 
 `Caveman 级别定义` 那行是刻意的，也是这套设计里唯一的不对称：注入**没有**宣告 `caveman` 技能已激活，反而明说 "It is NOT active yet: load it with the `skill` tool"。
 
@@ -45,31 +45,46 @@ Superpowers 全流程不再无条件施加到每个任务。注入文本里有�
 
 ## 输出语言
 
-模型默认用界面语言作答。语言来自 host 用户设置 `locale.preference`——设置页的语言开关写它，也可以直接改 `$DSH_HOME/settings.yaml`：
+模型写出的**每一段文本**——思考流、可见回复、工具间隙旁白、流程产物（plan/spec/评审/TDD 说明/todo）——都跟随 host 用户设置 `locale.preference`：设置页的语言开关写它，也可以直接改 `$DSH_HOME/settings.yaml`。
 
 | `locale.preference` | 行为 |
 |---|---|
-| `zh` | 默认中文；用户改用别的语言提问时，该条跟随用户 |
-| `en` | 默认英文；同上 |
-| 未设置 / 非法值 | 不猜：跟随用户消息语言 |
+| `zh` | 中文（含思考） |
+| `en` | 英文（含思考） |
+| 其他合法 tag（如 `ja`） | 该 tag 自身，不猜语言名 |
+| 未设置 / 非法值 | **兜底中文** |
 
-注入的这句话把**规则句放在最前**，界面语言只是"这条消息没给出语言线索"时的回退（`locale.preference: zh` 时的完整行）：
+规则落在两处，同一条断言、两种长度：
+
+**L1——system-prompt 段（`order: -1`，每步随 system 重发，排在 persona 之前）**：
 
 ```
-Output-language rule: write in the language of the user's message. Interface language: zh (Chinese) — use Chinese only when the user's message gives no language cue. Apply this to everything you write: your replies, your reasoning, your progress notes between tool calls, and every workflow artifact — plans, specs, review comments, TDD red/green explanations, todo items. Keep code, identifiers, commands, file paths, and error text verbatim: never translate them.
+Output-language directive: write every text you produce — your reasoning, your replies, your progress notes between tool calls, every workflow artifact (plans, specs, review comments, TDD red/green explanations, todo text), every visible field of a tool call (a shell description, a file's description, an escalation justification, a subagent's description), and every prompt or brief you hand to another agent — in 中文 (zh). This is a hard requirement, not a preference: the description fields of your tool calls are shown to the user verbatim, so write them in 中文 on every single call — not only when the surrounding command or path happens to be in 中文. A tool's own schema documents its field in English; that documents the field, it does not license an English value. Never write any of it in another language, including those tool-call fields and delegated prompts; never let a sandbox-denial message, a path, or an identifier justify switching to English for the prose around it. Keep tool names, enum values, code, identifiers, commands, file paths, and error text verbatim: never translate them.
 ```
 
-规则覆盖**回复正文**、**思考流与工具调用之间的进度旁白**、以及**流程产物**（plan、spec、评审意见、TDD 红绿说明、todo）；**代码、标识符、命令、路径、错误原文一律不翻译**。过程覆盖是 2026-09-22 的实测驱动补丁：此前只点名"replies and every workflow artifact"，交付物是中文而思考/轮内旁白是英文（10 轮会话思考中文字符 0.2%、正文 16.2%），详见 `evidence/VERIFICATION.md` 的 2026-09-22 一节。
+**L2——每条人类用户消息之后的提醒**（`agent/pre-step`，紧跟本步 claim 到的消息；判据是**本步的批次**，不查历史，所以每个回应人类的步都会得到一条）：
 
-生效边界（实测，见 `evidence/VERIFICATION.md` 的 2026-09-18 一节）：
+```
+Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中文 only — including what you put in tool-call fields and in a delegated prompt. Keep code, commands, paths, and errors verbatim.
+```
 
-- `locale.preference` 的**值**改动**热生效**——同一条会话内 zh → en → zh 三次切换，注入行每次都跟着变，**无需重启**；因为上下文行的 `text` 是 provider，每次组装提示词都重新渲染。
-- **插件 / 组合代码改动需要重启宿主**（`dsh web`）：运行中的 host 进程缓存了 preset 插件模块（Node ESM 模块缓存），**只新建会话不够**。实测：修复后的插件文件在磁盘上已是新文案，新建会话仍渲染旧文案；重启宿主后新建的会话才见新文案。
+**代码、标识符、命令、路径、错误原文一律不翻译**（含工具名与 `workspace-write` 这类枚举值）。注意 L1 已从约 240 字符增长到 **1102** 字符（每步重发），这是「工具字段必须本地化」的可见代价，不再是噪声级。
+
+**范围含工具调用参数里的可见字段与交给另一个 agent 的提示词**（2026-09-23 追加）。规则点名的不只是叙述文本，还包括：`bash` / `pwsh` 的 `description`（调用树与终端卡片直接渲染它，见 `dsh-client-ui-tool/lib/client.js:883`）、`present` 的 `files[].description`、沙箱越权的 `justification`（`dsh-sandbox/lib/index.js:102` 把它拼进审批弹窗的 `reason`）、`subagent` 的 `description`、`todo_write` 的 `content`，以及 `subagent` / `subagent_fork` / `workflow` / `ralph` 的提示词正文。**不译的例外**：`command`、`file_path`、`query`/`pattern`、`url`、工具名与枚举值，以及 harness 写死的字符串（例如审批弹窗那半句 `escalate sandbox to workspace-write:`）。证据清单见 v2 spec §12。
+
+为什么要两处（2026-09-23 实测驱动）：v1 只有一条 **user 角色**的运行时上下文行，规则文本已经点名 reasoning 与过程旁白，实测仍失守——一条 2 轮会话里思考块**首词 18/18 是英文**，剥掉引用块后思考 CJK 只有 `3.7%`（第 1 轮 `0.19%`），而可见正文 `37.3%`。诊断是投递层与近因：规则不在 system 里，且一轮英文锚定自我延续（T2 才升到 7.5%）。详见 `evidence/VERIFICATION.md` 的 2026-09-23 一节。
+
+生效边界（实测，见 `evidence/VERIFICATION.md` 的 2026-09-18 与 2026-09-23 两节）：
+
+- `locale.preference` 的**值**改动**热生效**——L1 下一步生效，L2 下一条生效；两条都是 provider，不做注册时快照。
+- **插件 / 组合代码改动需要重启宿主**（`dsh web`）：运行中的 host 进程缓存 preset 插件模块（Node ESM 模块缓存），**只新建会话不够**。
 - 安装/刷新 preset 后仍需**新建会话**（DSH 会话一旦开始不能切换模式）。
-- **思考语种是提示词级引导，不是保证**：覆盖句已点名 reasoning 与过程旁白，但思考用什么语言最终由模型决定；规则只提高遵从概率。
-- **`settings` 服务不可达时没有可观测信号**：降级静默生效（插件只 `warn` 一次，界面不显示），唯一判据是注入行原文——它会落到 `Interface language: not set — never assume one; switch whenever the user switches language.` 那一支。
+- **思考语种是提示词级引导，不是熔断**：v2 把它提到 system 层并加了每轮近因，仍不构成保证。
+- **中文任务书可能降低外部代理的执行准确度**：`subagent` 若路由到 `claude-code` / `codex`，规则会要求提示词正文用界面语言。本仓库只把语言要求交给模型，不评估下游模型的语言能力；若要回退，把委派提示词从覆盖枚举里删掉即可（规则文本、测试与文档三处同步改）。
+- **`settings` 服务不可达时没有界面信号**：降级静默生效（插件只 `warn` 一次），唯一判据是渲染出的文本——它会落到中文兜底那一支。
+- 界面语言是 `en` 时，本规则要求**连思考也用英文**；不会跟随你自己消息的语言。
 
-实现落在 `preset/plugins/output-language/index.js`：注册一条 `order: 105` 的 `systemPrompt.context`，`text` 是每次组装都重跑的 provider；插件自包含，失败路径降级为"跟随用户"，绝不打断提示词组装。
+实现落在 `preset/plugins/output-language/index.js`：一个 `order: -1` 的 `systemPrompt.section`（provider 文本）+ 一个 `agent/pre-step` 监听器；插件自包含，`section()` 不可用时只丢 L1 并 warn 一次，绝不打断会话。
 
 ## 级别切换
 
@@ -105,7 +120,7 @@ dsh-engineering/
 │   │   │   ├── index.js
 │   │   │   ├── package.json
 │   │   │   └── caveman-command.test.mjs
-│   │   └── output-language/         # 输出语言跟随界面语言（动态上下文行）
+│   │   └── output-language/         # 输出语言：system 段（order -1）+ 每条用户消息提醒
 │   │       ├── index.js
 │   │       ├── package.json
 │   │       └── output-language.test.mjs

@@ -620,3 +620,155 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
 - `deriveMessages()` 会包含已注入的 plugin user 消息，是从 harness 的 surface 契约与既有会话转录
   （注入确被模型看见）推得，**未**用独立探针直接打印一次 `deriveMessages()` 的内容。
 
+
+## 2026-09-23 输出语言 v2（system 段 + 每轮提醒）
+
+**触发**：takisy 工作区会话 `session-d0c635f9-875d-4dc4-934d-fda5a2f3bbec`（`engineering`、界面 `zh`、用户全程中文、2 轮 18 步）的实测——v1 的语言行与 `8843205` 扩写的覆盖句**都已生效**（运行时上下文含 `your reasoning, your progress notes between tool calls`；bootstrap 注入 `1` 次），但思考仍是英文。
+
+| 指标 | 实测 |
+|---|---|
+| 思考流 CJK（原始 / 剥引用后） | `6928/63609 = 10.9%` / `2097/56942 = 3.7%` |
+| 思考块首词语言 | `18/18` 英文 |
+| 第 1 轮 / 第 2 轮思考 CJK（剥引用后） | `0.19%` / `7.5%` |
+| 可见正文 CJK | `1567/4206 = 37.3%` |
+| bootstrap 注入次数 | `1`（幂等修复生效） |
+
+原始 `10.9%` 是假象：那些 CJK 字符几乎全是被引用的中文原文、`AGENTS.md` 片段与 `中文摘要` 这类术语。
+
+**诊断**：规则投递在 user 角色的历史消息里（`source.kind: "plugin"`、`form: "snapshot"`、`systemPromptUpdate: "in-history"`），而 system 消息 `8514` 字符里只有 `9` 个 CJK 字符、完全没提语言；规则之后紧跟 `3593` 字符英文 skill 目录与 `11662` 字符英文 bootstrap。按来源分类的 CJK 比例：system 消息 `0.11%`、bootstrap `0.07%`、skill 目录 `0%`、工具 schema 全英文，而 `AGENTS.md` `52.3%`、真实用户消息 `60.9%`。
+
+**设计**：`docs/superpowers/specs/2026-09-23-output-language-v2-design.md`（实施计划 `docs/superpowers/plans/2026-09-23-output-language-v2.md`）。
+
+**架构性未知的关闭方式（2026-09-23，未跑运行时探针）**：原计划的第一步是起一条真会话实证 `systemPrompt.section()` 在 preset realm 可调用（v2 spec §3 约束 1 把它列为设计唯一的架构性未知）。实施时改用三条代码级证据，因此**没有**会话转录可贴：
+
+1. **harness 自己的加载器文档**（`@deepseek-ai/dsh-agent-presets/lib/index.js` 的 `mount` 模块）逐字写着：entry contexts chain to the context the subtree was plugged into, so every `ctx.tools` and `ctx.systemPrompt` registration inside the preset files into **that agent's layer** and unwinds with it。
+2. **该方法确实存在**：运行时内省 `@deepseek-ai/dsh-system-prompt` 的 `SystemPrompt.prototype`，输出为
+
+```
+SystemPrompt 类存在: true
+原型方法 section : function
+原型方法 context : function
+原型方法 getSectionOrder: function
+原型成员: section, getSectionOrder, getContextOrder, context, suppressRuntimeContext, tools, variable, assemble
+section 与 context 同源同类: true
+```
+
+   即**不存在"有 `context` 没有 `section`"的宿主版本**。
+3. **该 realm 确实能拿到这个服务**：v1 的 `context()` 已实测在该 realm 跑通（那条语言行进了会话 `session-d0c635f9` 的运行时上下文），而同一次 `inject(['systemPrompt'])` 给的就是同一个 `scope.systemPrompt` 对象。
+
+原计划的探针插件（`preset/plugins/section-probe/`、组合行与自测）因此在落地前撤销，未进入任何提交。**仍未观察到的只剩一个观测量**：新 L1 文本出现在渲染后的 system 消息里、且位于 persona 之前——由本节末尾的端到端实测覆盖。
+
+**单测与守卫**：
+
+```
+$ npm test
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 280.503002
+```
+
+插件自测（`node preset/plugins/output-language/output-language.test.mjs`）覆盖 14 组断言：两条渲染函数的四态整行 golden、非法输入兜底、`resolveLanguageTag` 的四类不可读路径与 warnOnce、section 注册形状（`order: -1`、**零条 context**）、动态重读、`section()` 缺失时的降级、以及 pre-step 的七种批次形状。preset 层守卫（`scripts/output-language.test.mjs`）改读 v2 spec §6 并断言 v1 的 `renderLanguageContext` **不存在**（防留别名）。
+
+**组合健康检查**：
+
+```
+$ node scripts/verify-composition.mjs
+roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
+2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
+```
+
+**落地过程中修正的一处测试缺陷**：自包含断言原为 `!source.includes('@deepseek-ai/')`，而新源码的 JSDoc 里合法地写着 "must not import any `@deepseek-ai/*` package"，于是把文档文字判成了导入。改为匹配真正的导入语法 `/(?:from|import)\s*\(?\s*['"]@deepseek-ai\//`（要求带引号说明符），**语义严格更强**，不是放宽。
+
+### 端到端实测（2026-09-23，重启宿主后）
+
+人类重启 `dsh web` 后，**同一个会话**（`session-e5419a0a…`，09:02 创建）被接着跑，system 段与 runtime context 都重组为新版本。转录分界点：**第 1074 行起**是新 system（含 L1）。
+
+**样本 1：重启后第一轮**（同一会话，1 轮，含 3 个思考块）
+
+| 指标 | 阈值 | 实测 | v1 基线（takisy 会话） |
+|---|---|---|---|
+| 思考流剥引用后 CJK | ≥ 50% | **`1086/1813 = 59.9%`** ✅ | `3.7%` |
+| 思考块首段含中文 | 中文 | **`3/3`** ✅ | `0/18` |
+| 可见正文 CJK（原样） | ≥ 50% | `812/2374 = 34.2%` ❌ | `37.3%` |
+| 可见正文 CJK（剔代码块与行内代码后） | — | `796/1807 = 44.1%` | — |
+
+**这一轮可见正文未达 50%，如实记录。** 原因是内容性质：该轮是对"宿主是否重启、探针是否生效"的状态回报，正文里密集出现 `preset/plugins/output-language/index.js`、`scripts/install.sh`、`npm test`、提交哈希这类**按设计不翻译**的标识符与路径，剔除代码后仍留 `44.1%`。以状态汇报轮衡量"正文语言"口径偏窄；**多轮中文任务样本仍待补**（见诚实清单）。思考流与轮首两项是本需求的真正靶心，均已达标。
+
+**L1 位置（本轮 system 消息内）**：`Output-language directive` 在偏移 `50`，persona（`You are a coding agent`）在 `428`，caveman 风格句在 `1269` ⇒ **L1 先于 persona、先于风格指令**，与设计（`order: -1` 落在 identity `-1000` 与 persona `0` 之间）一致。system 里写入的正是当前 tag 的中文形态。
+
+**场景 2（界面语言热切换，无需重启会话）——通过，证据是同一会话内 L1 连变两次**：
+
+```
+行  1074  L1 语言 = 中文 (zh)      ← 重启后头一轮
+行  1114  L1 语言 = English (en)   ← 写 locale.preference: en 之后
+行  1125  L1 语言 = 中文 (zh)      ← 还原 locale.preference: zh 之后
+```
+
+两次都**没有重启宿主、没有新建会话**，system 段当场跟着改；L2 提醒同步出现 `Language: English (en). …`。同一会话里 L1 的语言变了两次，既证明 L1 是 provider（每次组装重读设置），也证明 v2 覆盖了 v1 的"改设置需重启"边界。
+
+**场景 3（子代理）——通过**：派一个子代理读 `package.json`，其会话（`d59b16ee…`，`delegationDepth: 1`、`agentPreset: engineering`）转录显示 **system 段含 L1（`中文 (zh)`）、含 persona、长度 `8897`**，其后紧跟 L2 注入；子代理报告**全中文**并逐字回贴了它看到的规则原文。
+
+**宿主日志**：`~/.dsh/logs/` 下无 `output-language` 记录（该目录只有 09-14 的旧文件）⇒ `systemPrompt.section()` 未走 try/catch 降级路径，无告警。
+
+### 未验证（诚实清单）
+
+- **多轮中文任务样本未补**：可用样本只有 1 轮状态回报（见上表）。v2 spec §9 的场景 1 要求一条中文**多轮任务**，其正文应达 ≥ 50%；本轮正文 `44.1%`（剔代码）未达，**不修改门槛、也不把单轮结果当作达标**。
+- **`en` 界面下的多轮行为未观察**：热切换已证 L1/L2 会变，但未在 `en` 下跑完整任务确认思考也随之为英文。
+- 未在 `--copy` 安装模式下验证本次改动。
+- 子代理只回了报告文本；其**思考流**语种未测（本次只看了它的报告与 system 段）。
+
+## 2026-09-23 追加需求：工具调用字段与委派提示词（v2 §12）
+
+**触发**：v2 首版落地并通过端到端实测后，owner 扩大范围——"`bash` 等一些 `description` 也都使用界面设置语言，总之，所有内容都使用界面设置语言"。
+
+**范围查证（读 harness 源码，非推断）**：进界面的模型生成字段——`bash`/`pwsh` 的 `description`（调用树摘要白名单 `dsh-client-ui-tool/lib/client.js:883` `SUMMARY_KEYS.bash = ["description","command"]`，终端卡片 props 同文件 `503`/`592-610`，schema 明文 "(shown in the UI)"）、`present.files[].description`、越权 `justification`（`dsh-sandbox/lib/index.js:102` 拼成 `reason: escalate sandbox to ${mode}: ${justification}`）、`subagent.description`（`dsh-tool-subagent/lib/index.js:510`/`529` 做卡片 `label`）、`todo_write.todos[].content`（`planSummary` 进调用树）。另按 owner 决定纳入 `subagent`/`subagent_fork`/`workflow`/`ralph` 的提示词正文。完整清单与"不译的例外"见 v2 spec §12。
+
+**改动**：只改两段规则文本（L1 加字段与委派枚举、L2 加短句），三层机制不动。三处冻结副本（插件自测 golden / v2 spec §6 / README 示例）**全部由渲染器导出后程序化写入**，避免手抄漂移——落盘后校验结果为 `L1 状态行 4 / L2 状态行 4 / 与渲染器全等: true`。组合行注释同步补了范围。
+
+**验收**：`npm test` `38 pass / 0 fail`、`node preset/plugins/output-language/output-language.test.mjs` 全绿、`node scripts/verify-composition.mjs` `2a OK`。落地过程中修正一处测试脆弱点：第 4 组断言硬编码了旧句的结尾句号，而新句改为逗号 + 续句，遂改为跨标点的正则 `/Never write any of it in another language[.,]/`（守的是"禁止别的语言"这个语义，不是哪个标点收尾）。
+
+**未验证**：新措辞需要**重启宿主**才装载（插件代码改动，见生效边界）；装载后需按 v2 spec §12.4 逐项验收——`bash.description` 为中文、越权 `justification` 为中文、`present`/`subagent` 的 `description` 为中文、`subagent.prompt` 为中文且子代理能正常完成。本次尚未跑。
+
+### §12.4 逐项验收（2026-09-23，首轮）
+
+重启宿主后（转录行 1462 起为新 L1），逐项结果：
+
+| # | 检查项 | 实测 | 判定 |
+|---|---|---|---|
+| 1 | L1 含字段与委派枚举、L2 含短句 | 本轮 system 段与注入文本逐字确认 | ✅ |
+| 2 | `subagent.description` 为中文 | `验收子代理提示词语言` | ✅ |
+| 3 | `subagent.prompt` 为中文 | `d59b16ee…` 与 `6a898ed9…` 两例子代理收到的首条人类消息均为中文；子代理报告全中文、任务完成 | ✅ |
+| 4 | `bash.description` 为中文 | **重启后 1/12，重启前 0/167** | ❌ 未达标 |
+
+**判定 4 的关键细节（避免把"未生效"与"遵从度低"混为一谈）**：`落盘探针：中文描述是否写入转录` 这一条**确实以中文落盘**，证明机制通、转录如实记录参数；同轮其余 11 次是英文。即这是**模型遵从度波动**，不是管道故障。
+
+**我在本轮中犯的一次判断错误（如实记录）**：我先前看到转录里 `Check bash descriptions landed in Chinese` 等英文描述时，主观认为"我写的是中文、只是转录滞后"，并据此向你报告"第 1 项通过"。原始 `tool/call` 的 `arguments` 显示那些调用写的就是英文——**我的自述不能作为证据，转录才是**。此错误是本次把 `bash.description` 单列成硬指标的直接原因。
+
+**据此的处置**：L1 增加独立强断言段（`This is a hard requirement, not a preference…`，并把尾句扩为含工具名与枚举值不译），提交 `4219b48`；成本由 240 增至 `1102` 字符，已写入 README 与 spec §10，并预留回退点。**强化后的遵从度尚未实测**——需要再次重启宿主装载。
+
+### §12.4 逐项验收（2026-09-23，第二轮：L1 强化后）
+
+宿主重启装载强化版 L1（转录行 1632 起，该版含 `hard requirement, not a preference`）后重测：
+
+| 阶段 | `bash`/`pwsh` 的 `description` 中文比例 |
+|---|---|
+| 强化前（全部历史） | `1/189 = 1%` |
+| **强化后（本轮）** | **`5/5 = 100%`** |
+
+5 条样本逐条全为中文，其中一条的命令体是大段英文脚本（`python3 -c '...'`）——即"命令本身是英文、所以描述也跟着英文"这条路径被那句 `not only when the surrounding command or path happens to be in 中文` 堵住了。
+
+**结论**：§12 的四项验收在第二轮全部通过——
+
+1. L1/L2 装载 ✅（本轮 system 段含强化句）
+2. `bash.description` 中文 ✅（`5/5`，对照强化前 `1%`）
+3. `subagent.description` 中文 ✅（`验收子代理提示词语言`）
+4. `subagent.prompt` 中文且子代理正常完成 ✅（`d59b16ee…`、`6a898ed9…` 两例）
+
+**代价（如实记录，已写入 README 与 spec §10）**：L1 由约 240 增至 `1102` 字符、每步重发；L2 由约 110 增至 `199` 字符、每条用户消息。这是"工具字段必须本地化"的可见成本，不再是噪声级。
+
+**仍未覆盖**：`present.files[].description` 与越权 `justification` 在本轮 v2 实现里尚未被触发过（前者需要交付文件、后者需要一次沙箱越权被拒），因此**这两项没有实测样本**，只由同一句 L1 断言覆盖，不得记为已验收。
