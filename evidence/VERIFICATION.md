@@ -733,3 +733,20 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,…}]
 **验收**：`npm test` `38 pass / 0 fail`、`node preset/plugins/output-language/output-language.test.mjs` 全绿、`node scripts/verify-composition.mjs` `2a OK`。落地过程中修正一处测试脆弱点：第 4 组断言硬编码了旧句的结尾句号，而新句改为逗号 + 续句，遂改为跨标点的正则 `/Never write any of it in another language[.,]/`（守的是"禁止别的语言"这个语义，不是哪个标点收尾）。
 
 **未验证**：新措辞需要**重启宿主**才装载（插件代码改动，见生效边界）；装载后需按 v2 spec §12.4 逐项验收——`bash.description` 为中文、越权 `justification` 为中文、`present`/`subagent` 的 `description` 为中文、`subagent.prompt` 为中文且子代理能正常完成。本次尚未跑。
+
+### §12.4 逐项验收（2026-09-23，首轮）
+
+重启宿主后（转录行 1462 起为新 L1），逐项结果：
+
+| # | 检查项 | 实测 | 判定 |
+|---|---|---|---|
+| 1 | L1 含字段与委派枚举、L2 含短句 | 本轮 system 段与注入文本逐字确认 | ✅ |
+| 2 | `subagent.description` 为中文 | `验收子代理提示词语言` | ✅ |
+| 3 | `subagent.prompt` 为中文 | `d59b16ee…` 与 `6a898ed9…` 两例子代理收到的首条人类消息均为中文；子代理报告全中文、任务完成 | ✅ |
+| 4 | `bash.description` 为中文 | **重启后 1/12，重启前 0/167** | ❌ 未达标 |
+
+**判定 4 的关键细节（避免把"未生效"与"遵从度低"混为一谈）**：`落盘探针：中文描述是否写入转录` 这一条**确实以中文落盘**，证明机制通、转录如实记录参数；同轮其余 11 次是英文。即这是**模型遵从度波动**，不是管道故障。
+
+**我在本轮中犯的一次判断错误（如实记录）**：我先前看到转录里 `Check bash descriptions landed in Chinese` 等英文描述时，主观认为"我写的是中文、只是转录滞后"，并据此向你报告"第 1 项通过"。原始 `tool/call` 的 `arguments` 显示那些调用写的就是英文——**我的自述不能作为证据，转录才是**。此错误是本次把 `bash.description` 单列成硬指标的直接原因。
+
+**据此的处置**：L1 增加独立强断言段（`This is a hard requirement, not a preference…`，并把尾句扩为含工具名与枚举值不译），提交 `4219b48`；成本由 240 增至 `1102` 字符，已写入 README 与 spec §10，并预留回退点。**强化后的遵从度尚未实测**——需要再次重启宿主装载。
