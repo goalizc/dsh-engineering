@@ -337,7 +337,7 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
 **2b. 真挂载与技能目录（残余缺口，需要用本仓库之外的探针）**
 
 - ≤0.1.5 时代的探针（**不在本仓库、也不在 harness 包里**，见 `grep -rl sp_probe` 无命中）：`sp_probe validate=engineering` → 应得 `MOUNT OK: engineering`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）；`sp_verify preset=engineering cwd=<workspace>` → 断言该 preset 作用域下的技能目录。
-- 0.2 这一层没有等价探针，只能在活体上取：`Config.listConfigs` 里 `preset-engineering` 行存在（声明已注册，`broken` 字段为空即挂载审计通过），再用一个**新建会话**验证真挂载——技能目录、`/caveman`、bootstrap 注入是否都在（这一步与第 3 层合并）。
+- 0.2 这一层没有等价探针，只能在活体上取两处：`Config.listConfigs`（`name` 用 `@deepseek-ai/dsh-agent-preset`）应列出 `include:preset-engineering`，证明声明已注册——但它**不给** `broken`；挂载审计的结果只在客户端 roster 上可见（「设置 → Agent 预设」里该行没有诊断文字即通过）。真挂载再由一个**新建会话**验证：技能目录、`/caveman`、bootstrap 注入是否都在（这一步与第 3 层合并）。
 
 **3. 端到端（人类验收，唯一的最终证据）**
 
