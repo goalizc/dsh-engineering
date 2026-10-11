@@ -5,9 +5,8 @@
 // `scripts/build-bootstrap.sh` already asserts that the three whitelisted
 // caveman skills exist, but only `scripts/sync-caveman-skills.sh` runs it: a
 // `sync-superpowers-skills.sh`-only or interrupted sync leaves a tree missing a
-// caveman skill, and `npm test`'s `pretest` (the manifest rebuild) never looks
-// at skill bodies — so the loss is silent until a session loads a skill that is
-// not there. Superpowers owns the whole `skills/` tree and is restored wholesale
+// caveman skill, and the rest of `npm test` never looks at skill bodies — so the
+// loss is silent until a session loads a skill that is not there. Superpowers owns the whole `skills/` tree and is restored wholesale
 // by its own sync; the caveman whitelist is the partial vendee that a wholesale
 // replace actually deletes, which is why these three are the pinned set.
 //

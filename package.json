@@ -10,16 +10,13 @@
     "url": "https://github.com/goalizc/dsh-engineering/issues"
   },
   "type": "module",
-  "main": "index.js",
-  "files": ["index.js", "cordis.patch.yml", "preset", "scripts/plant-core.mjs", "preset/.manifest.json"],
+  "files": ["cordis.patch.yml", "preset"],
   "engines": { "node": ">=18" },
   "dsh": { "bundle": { "patch": "./cordis.patch.yml" } },
   "publishConfig": { "access": "public" },
   "scripts": {
-    "build:manifest": "node scripts/build-manifest.mjs preset --out preset/.manifest.json",
     "build:preset-patch": "node scripts/build-preset-patch.mjs --write",
     "verify:preset-patch": "node scripts/verify-preset-patch.mjs",
-    "pretest": "npm run build:manifest",
     "test": "node --test scripts/*.test.mjs preset/plugins/*/*.test.mjs"
   }
 }

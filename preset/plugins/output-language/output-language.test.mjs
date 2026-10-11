@@ -2,10 +2,9 @@
  * Self-test for the output-language plugin.
  *
  * No test framework: it asserts and exits non-zero, so it runs standalone under
- * the harness's own Node — `scripts/install.sh` runs every preset-local plugin's
- * same-named self-test as an install gate, and a plugin without one fails the
- * install. Named `output-language.test.mjs` so `npm test`'s plugin glob collects
- * it too.
+ * the harness's own Node, and `npm test`'s plugin glob collects it (every
+ * preset-local plugin ships one; there is no install-time gate any more).
+ * Named `output-language.test.mjs` for that glob.
  *
  * The plugin imports nothing from the harness, so this file needs no
  * `node_modules` link. It never starts an agent: the renderers are pure
