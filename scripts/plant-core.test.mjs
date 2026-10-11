@@ -105,6 +105,36 @@ test('plant refuses non-empty dest without our marker (skipped)', async () => {
   await assert.rejects(plant({ source: src, destRoot, policy: 'copy' }));
 });
 
+// A `link`-policy install leaves a real directory of symlinks with no marker
+// (the link branch never writes one). A later copy install — e.g. the npm
+// bundle plugin on dsh startup — must take that directory over instead of
+// refusing forever: the links are installer output, not user data. This exact
+// sequence broke startup on a dsh 0.2.0-rc.2 upgrade.
+test('plant copy takes over a previous link install (pure symlinks, no marker)', async () => {
+  const src = await sourceWithManifest();
+  const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
+  await plant({ source: src, destRoot, policy: 'link' });
+  const dest = join(destRoot, PRESET_ID);
+  const { lstat } = await import('node:fs/promises');
+  assert.ok((await lstat(join(dest, 'bootstrap.md'))).isSymbolicLink());
+  const r = await plant({ source: src, destRoot, policy: 'copy' });
+  assert.equal(r.action, 'planted');
+  assert.ok(!(await lstat(join(dest, 'bootstrap.md'))).isSymbolicLink());
+  assert.equal(await readFile(join(dest, 'bootstrap.md'), 'utf8'), 'hello');
+  const inst = JSON.parse(await readFile(join(dest, '.installed.json'), 'utf8'));
+  assert.equal(inst.files['bootstrap.md'], await hashFile(join(src, 'bootstrap.md')));
+});
+
+// One real file anywhere in the marker-less directory means a hand-made tree:
+// the takeover above must not fire and the refusal must stand.
+test('plant still refuses a marker-less dest mixing links with real files', async () => {
+  const src = await sourceWithManifest();
+  const destRoot = await mkdtemp(join(tmpdir(), 'plant-dest-'));
+  await plant({ source: src, destRoot, policy: 'link' });
+  await writeFile(join(destRoot, PRESET_ID, 'user.txt'), 'x');
+  await assert.rejects(plant({ source: src, destRoot, policy: 'copy' }));
+});
+
 test('plant link policy creates real dir + per-entry symlinks, no manifest link', async () => {
   const src = await sourceWithManifest();
   const destRoot = await mkdtemp(join(tmpdir(), 'plant-link-'));

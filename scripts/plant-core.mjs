@@ -98,9 +98,20 @@ export async function plant({ source, destRoot, name = PRESET_ID, policy = 'copy
   const { files: manifestFiles, manifestSource } = await resolveManifest({ source, manifest });
 
   if (!installed) {
-    let hadNonEmpty = false;
-    try { hadNonEmpty = (await readdir(destDir)).length > 0; } catch { hadNonEmpty = false; }
-    if (hadNonEmpty) throw new Error(`destination ${destDir} exists without .installed.json; refusing to touch`);
+    let entries = [];
+    try { entries = await readdir(destDir, { withFileTypes: true }); } catch { entries = []; }
+    if (entries.length > 0) {
+      // A previous `link`-policy install leaves a real directory full of
+      // per-entry symlinks and no marker. Those links are installer output,
+      // not user data, so a copy install may take the directory over; any
+      // real file or subdirectory means a hand-made tree and still refuses.
+      if (!entries.every((ent) => ent.isSymbolicLink())) {
+        throw new Error(`destination ${destDir} exists without .installed.json; refusing to touch`);
+      }
+      for (const ent of entries) {
+        await rm(join(destDir, ent.name), { recursive: true, force: true });
+      }
+    }
   }
 
   await mkdir(destDir, { recursive: true });
