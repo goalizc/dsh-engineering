@@ -39,9 +39,9 @@ dsh plugin --profile <name> add github:goalizc/dsh-engineering
 
 升级到 0.2 后还要注意：
 
-- `$DSH_HOME/.agent-presets/engineering/` 不再被读取（文件还在，只是没人看）；确认无其他用途后可删。`settings.yaml` 里的 `agent-presets.default` 一节在 0.2 首次启动时被迁移逻辑改名成 `settings.yaml.imported` 并丢弃（新命名空间是 `agent-preset-registry`），默认值请在「设置 → Agent 预设」里重设。
+- `$DSH_HOME/.agent-presets/engineering/` 不再被读取（文件还在，只是没人看）；确认无其他用途后可删。整个 `settings.yaml` 在 0.2 首次启动时会被改名成 `settings.yaml.imported`，然后逐节写入同名 entry；`agent-presets` 这一节在 0.2 的组合里没有同名 entry（新行 id 是 `agent-preset-registry`），所以它不会被导入、只留在改名后的文件里，默认值请在「设置 → Agent 预设」里重设。
 - **同一个 preset id 只能声明一次**：若你曾在 profile 的 `cordis.patch.yml` 里手写过 `engineering` 声明行（迁移期的临时做法），必须在本 bundle 更新到本版本**之前**删掉，否则 `Duplicate agent preset: engineering` 会让声明行激活失败。
-- 0.1.5 用户留在 ≤`v0.1.0` 的标签：本版本（`0.2.0`）起 `cordis.patch.yml` 不再插入安装器行，直接在 ≤0.1.5 上加载它会在启动日志里报找不到 `@deepseek-ai/dsh-agent-preset`，preset 也不会出现。
+- 0.1.5 用户留在 ≤`v0.1.0` 的标签：本版本（`0.2.0`）起 `cordis.patch.yml` 不再插入安装器行，而声明行引用的 `@deepseek-ai/dsh-agent-preset` 在 ≤0.1.5 的依赖树里不存在，所以那一行只会在启动日志里留下一条 import 失败告警，preset 不会出现。（本条按 0.2 的启动审计语义推断——非 required 行失败只告警、不中断启动；未在 ≤0.1.5 上实跑。）
 
 改完 preset 源码后的两条命令：
 
@@ -206,7 +206,7 @@ scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器
 
 **改动类型决定要不要重启宿主**：preset 本地插件的**代码**改动需要重启宿主（`dsh web`）才生效——运行中的 host 进程缓存了插件模块，**只新建会话不够**；`settings` 的**值**改动是**热生效**的。两点的实测证据见「输出语言」节的生效边界。
 
-**已知缺陷（预先存在，本仓库不修 `scripts/plant-core.mjs`）**：按默认 `link` 策略装完后，宿主每次启动都会打印 `engineering: preset NOT installed — destination … exists without .installed.json; refusing to touch`。功能不受影响（条目是符号链接，仓库改动即时生效），但 **bundle 通道此后拒绝植入**。
+**曾经的缺陷（已修）**：按默认 `link` 策略装完后，宿主每次启动都会打印 `engineering: preset NOT installed — destination … exists without .installed.json; refusing to touch` —— `link` 策略留下一个「真实目录 + 逐项符号链接」且**不写** `.installed.json`，而 `copy` 策略因此永远拒绝接管。现在 `copy` 会接管**纯符号链接**的目标目录（那些链接是安装器产物，不是用户数据）；只要目录里出现任何一个真实文件或子目录，拒绝照旧。回归测试见 `scripts/plant-core.test.mjs` 的 `plant copy takes over a previous link install` 与 `plant still refuses a marker-less dest mixing links with real files`。
 
 ### 通过 `dsh plugin add` 安装（bundle 通道）
 
@@ -336,8 +336,8 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
 
 **2b. 真挂载与技能目录（残余缺口，需要用本仓库之外的探针）**
 
-- ≤0.1.5 时代的探针：`sp_probe validate=engineering` → 应得 `MOUNT OK: engineering`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）；`sp_verify preset=engineering cwd=<workspace>` → 断言该 preset 作用域下的技能目录。
-- harness 0.2 没有这两个探针。等价物只能在活体上取：`Config.listConfigs` 里 `preset-engineering` 行存在（声明已注册），再用一个**新建会话**验证真挂载——技能目录、`/caveman`、bootstrap 注入是否都在（这一步与第 3 层合并）。
+- ≤0.1.5 时代的探针（**不在本仓库、也不在 harness 包里**，见 `grep -rl sp_probe` 无命中）：`sp_probe validate=engineering` → 应得 `MOUNT OK: engineering`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）；`sp_verify preset=engineering cwd=<workspace>` → 断言该 preset 作用域下的技能目录。
+- 0.2 这一层没有等价探针，只能在活体上取：`Config.listConfigs` 里 `preset-engineering` 行存在（声明已注册，`broken` 字段为空即挂载审计通过），再用一个**新建会话**验证真挂载——技能目录、`/caveman`、bootstrap 注入是否都在（这一步与第 3 层合并）。
 
 **3. 端到端（人类验收，唯一的最终证据）**
 
