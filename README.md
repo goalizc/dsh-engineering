@@ -11,6 +11,45 @@
 
 上游技能**逐字复用**，不改写任何技能正文——这是上游移植规则的要求，也让升级同步变成一次目录复制。适配只发生在三处：一份工具映射文件、一段 bootstrap 拼装、三个 preset 本地插件（`bootstrap`、`caveman-command`、`output-language`）。
 
+## harness 0.2 迁移（0.2.0-rc.2 起）
+
+**上游换掉了 preset 的登记机制，这不是本仓库的 bug**：
+
+| | harness ≤0.1.5 | harness 0.2（0.2.0-rc.2 起） |
+|---|---|---|
+| preset 从哪来 | `@deepseek-ai/dsh-agent-presets` 扫描 `$DSH_HOME/.agent-presets/<id>/` | 组合树里的一行 `@deepseek-ai/dsh-agent-preset`，注册进 `@deepseek-ai/dsh-agent-preset-registry` |
+| 本仓库交付物 | `index.js` 在该 profile 启动时植入目录 | `cordis.patch.yml` 里的 `preset-engineering` 声明行 |
+
+0.2 把那套目录机制连同包一起删掉了；registry 的 README 原文是 *"Definitions are ordinary plugin rows; the registry neither scans directories nor accepts preset paths."*。所以**继续往 `~/.dsh/.agent-presets/engineering/` 植入文件毫无效果**：模式选择器里没有「工程模式」，而宿主日志一切正常——这是升级后最容易误判的一类静默退化。
+
+本仓库的 0.2 形态：
+
+- `preset/agent.cordis.yml` 仍是**源码**，但 0.2 的声明必须是组合里的静态行，于是它由 `scripts/build-preset-patch.mjs` 渲染进 `cordis.patch.yml`（产物入库；漂移由 `scripts/preset-patch.test.mjs` 守护）。渲染时按 0.2 的真实差异做三处改写：
+  1. preset 本地插件行 `'./plugins/<x>'` → `'@goalizc/dsh-engineering/preset/plugins/<x>'`：0.2 的 preset 子树继承 **profile 目录** 的 baseUrl，相对行会指向 profile 根下不存在的文件。
+  2. `@deepseek-ai/dsh-workflow-worker-thread` → `@deepseek-ai/dsh-workflow-ptc`（0.2 不再提供前者；行 id 同步改）。
+  3. `skill-filesystem.customSkillDirs` 改由运行时表达式解析包内 `preset/skills`，解析失败才回落到 legacy 植入目录。
+- `preset/preset.yml` 变成**显示元数据源**：`name`/`description`/`order` 被渲染进声明行（0.2 的 registry 不读这个文件）。
+- `index.js`、`scripts/install.sh`、`scripts/plant-core.mjs`、`scripts/verify-composition.mjs` 只服务 ≤0.1.5 的目录机制，0.2 上不会被加载或触发。
+
+安装（0.2）仍是 bundle 通道，装完**重启宿主**，再**新建**会话（模式在创建时确定，不能中途切换）：
+
+```sh
+dsh plugin --profile <name> add github:goalizc/dsh-engineering
+```
+
+升级到 0.2 后还要注意：
+
+- `$DSH_HOME/.agent-presets/engineering/` 不再被读取（文件还在，只是没人看）；确认无其他用途后可删。`settings.yaml` 里的 `agent-presets.default` 一节在 0.2 首次启动时被迁移逻辑改名成 `settings.yaml.imported` 并丢弃（新命名空间是 `agent-preset-registry`），默认值请在「设置 → Agent 预设」里重设。
+- **同一个 preset id 只能声明一次**：若你曾在 profile 的 `cordis.patch.yml` 里手写过 `engineering` 声明行（迁移期的临时做法），必须在本 bundle 更新到本版本**之前**删掉，否则 `Duplicate agent preset: engineering` 会让声明行激活失败。
+- 0.1.5 用户留在 ≤`v0.1.0` 的标签：本版本（`0.2.0`）起 `cordis.patch.yml` 不再插入安装器行，直接在 ≤0.1.5 上加载它会在启动日志里报找不到 `@deepseek-ai/dsh-agent-preset`，preset 也不会出现。
+
+改完 preset 源码后的两条命令：
+
+```sh
+npm run build:preset-patch     # 重新渲染 cordis.patch.yml（改 preset/agent.cordis.yml 或 preset.yml 之后）
+npm run verify:preset-patch    # 静态校验：漂移 + 方言 + specifier 解析 + 迁移陷阱
+```
+
 ## 自动生效的五件事（其中一件刻意"不生效"）
 
 | 能力 | 保障方式 |
@@ -102,12 +141,12 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 
 ```
 dsh-engineering/
-├── index.js                         # bundle 安装器插件（dsh bundle 形态的入口）
-├── cordis.patch.yml                 # bundle 挂载声明
+├── index.js                         # ≤0.1.5 的安装器插件（0.2 不再挂载它，见「harness 0.2 迁移」）
+├── cordis.patch.yml                 # 生成物：0.2 的 preset 声明行（由 build-preset-patch.mjs 渲染）
 ├── package.json                     # 也定义 npm test（脚本与插件测试的 glob）
-├── preset/                          # 这个目录就是被 DSH 挂载的"模式"
-│   ├── preset.yml                   # 显示名（工程模式）、描述、排序（模式选择器读它）
-│   ├── agent.cordis.yml             # 组合：persona + 标准工具面 + 插件 + 技能目录
+├── preset/                          # preset 的源码树；0.2 通过包内子路径引用其中的插件与技能
+│   ├── preset.yml                   # 显示名（工程模式）、描述、排序的**源码**（渲染进 cordis.patch.yml）
+│   ├── agent.cordis.yml             # 组合源码：persona + 标准工具面 + 插件 + 技能目录
 │   ├── bootstrap.md                 # 生成物：using-superpowers 正文 + 工具映射 + caveman 默认
 │   ├── SYNC.md                      # 生成物：各上游 commit / 版本 / 同步时间
 │   ├── .manifest.json               # 生成物：逐文件 sha-256（gitignore，发布时经 files 白名单打入）
@@ -131,13 +170,16 @@ dsh-engineering/
 │   ├── sync-lib.sh                  # 两个 sync 共用的 SYNC.md 写入
 │   ├── build-bootstrap.sh           # 重建 bootstrap.md（带技能存在性自检）
 │   ├── build-manifest.mjs           # 生成逐文件 sha-256 清单
-│   ├── plant-core.mjs               # 植入引擎（link / copy 两种策略）
-│   ├── install.sh                   # 投影到 ${DSH_HOME}/.agent-presets/engineering
-│   ├── verify-composition.mjs       # 第 2a 层：用 harness 自带 discoverPresets 查组合健康
+│   ├── build-preset-patch.mjs       # 0.2：把 agent.cordis.yml + preset.yml 渲染成 cordis.patch.yml
+│   ├── verify-preset-patch.mjs      # 0.2 静态层：方言解析 + 每条 specifier 解析 + 产物漂移 + 迁移陷阱
+│   ├── plant-core.mjs               # ≤0.1.5 的植入引擎（link / copy 两种策略）
+│   ├── install.sh                   # ≤0.1.5：投影到 ${DSH_HOME}/.agent-presets/engineering
+│   ├── verify-composition.mjs       # ≤0.1.5 的第 2a 层：用 harness 自带 discoverPresets 查组合健康
 │   ├── index.test.mjs               # 安装器插件测试
 │   ├── plant-core.test.mjs          # 植入引擎测试
+│   ├── preset-patch.test.mjs        # 0.2 守卫：产物 == 生成物，且三条改写结果都在
 │   ├── caveman-default-level.test.mjs  # 三个家的默认级别 + 插件级别名 == vendored 技能
-│   ├── bundle-identity.test.mjs     # 守卫：包名 == patch 自指、dsh.bundle.patch 存在、files 齐备
+│   ├── bundle-identity.test.mjs     # 守卫：声明行指向包内子路径、旧安装器行未挂载、files 齐备
 │   ├── vendored-skills.test.mjs     # 白名单 caveman 技能必须在（半同步树不得通过 npm test）
 │   ├── task-sizing.test.mjs         # 守卫：自撰的 Task sizing 分档节存在且未被污染
 │   └── output-language.test.mjs     # 守卫：组合挂载 output-language 行 + 插件导出面
@@ -147,6 +189,10 @@ dsh-engineering/
 ```
 
 ## 安装 / 刷新
+
+> **本节描述 ≤0.1.5 的目录植入通道。** harness 0.2 请走「harness 0.2 迁移」一节的 bundle 通道：
+> 那里的 `cordis.patch.yml` 是生成物，而 `scripts/install.sh` 植入的 `$DSH_HOME/.agent-presets/`
+> 在 0.2 上不会被任何代码读取（现象就是模式选择器里没有「工程模式」）。
 
 ```sh
 scripts/build-bootstrap.sh          # 技能有变动时先跑
@@ -165,7 +211,7 @@ scripts/install.sh --copy           # 深拷贝（检出可能被删除的机器
 ### 通过 `dsh plugin add` 安装（bundle 通道）
 
 ```sh
-dsh plugin --profile <name> add /path/to/goalizc-dsh-engineering-0.1.0.tgz   # 本地 tarball
+dsh plugin --profile <name> add /path/to/goalizc-dsh-engineering-0.2.0.tgz   # 本地 tarball（npm pack 产物）
 dsh plugin --profile <name> add github:goalizc/dsh-engineering               # GitHub
 ```
 
@@ -219,15 +265,15 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 
 ## 验证
 
-四步，从便宜到昂贵：第 1 层与**第 2a 层在本仓库可直接跑**；第 2b 层需要本会话之外的探针工具；第 3 层不是自动化的。
+四步，从便宜到昂贵：第 1 层在任何机器上可跑；**第 2a 层在 0.2 与 ≤0.1.5 各有自己的脚本**（都需要机器上装了对应版本的 harness）；第 2b 层需要本会话之外的探针工具；第 3 层不是自动化的。
 
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 38 pass / 0 fail
+npm test          # 47 pass / 0 fail
 ```
 
-这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（7 个文件：植入引擎、安装器插件、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫、输出语言守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
+这会先跑 `build:manifest` 重建 `preset/.manifest.json`，然后按 glob 收集全部测试：`scripts/*.test.mjs`（8 个文件：植入引擎、安装器插件、0.2 preset 声明守卫、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫、输出语言守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
 
 ```sh
 node preset/plugins/bootstrap/bootstrap.test.mjs
@@ -251,6 +297,29 @@ bootstrap 自测断言移植契约的三条性质：首次注入一次、不重�
 
 **2a. 组合健康（本仓库可跑，需要机器上装了 harness）**
 
+harness **0.2**（`cordis.patch.yml` 的声明行是否可用于挂载）：
+
+```sh
+node scripts/verify-preset-patch.mjs
+```
+
+期望（六项全 OK；`dialect` 在找不到已安装 harness 的 js-yaml 时记 SKIP 而非 FAIL）：
+
+```
+  OK   drift       cordis.patch.yml 与生成物一致
+  OK   dialect     YAML 方言解析通过（js-yaml @ <harness>/node_modules）
+  OK   declaration id=engineering name=工程模式 order=5
+  OK   specifiers  34 行全部解析得到
+  OK   row-count   21 个顶层行 / 含嵌套共 34 行
+  OK   porting     没有 0.1.5 → 0.2 的已知陷阱
+```
+
+它证明的是**声明可用于挂载**：产物等于生成物、YAML 合 loader 方言、每条 specifier 都解析得到（`@deepseek-ai/*` 包在 harness 依赖树里、包内 `preset/...` 文件在本包里）、没有 `'./plugins/...'` 相对行与 `worker-thread` 残留。**它不等于挂载**：不 import 任何插件、不求值行配置、不检查 realm、不断言技能目录——那些属于 2b。
+
+活体确认（0.2）：`cordis_inspect_query` 的 `Config` provider，`name` 用 `@deepseek-ai/dsh-agent-preset`，应列出 `include:preset-engineering`；`dsh --profile <name> --dump-config-schema` 也能做同样的确认，但注意它会对**每一个** preset 声明行报 `unrecognized Loader tree carrier`（shipped 的 standard/ptc/minimal/cordis 一样报），那是投影器读不了 `config.plugins` 的已知限制，不代表声明有问题。
+
+harness **≤0.1.5**（已植入目录的组合健康，目录机制的 2a 层）：
+
 ```sh
 scripts/install.sh                                  # 或已装好旧目录
 node scripts/verify-composition.mjs                 # 默认查 ${DSH_HOME:-~/.dsh}/.agent-presets
@@ -263,12 +332,12 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
 2a OK: "engineering" is a loadable roster row (broken: null) — every row specifier resolves.
 ```
 
-`broken: null` 表示组合 YAML 合 loader 语法、每条行都能解析（`@deepseek-ai/*` 包在同一套 `node_modules` 上行查找里找得到，`./plugins/...` 相对行指向的文件存在）。**它不等于挂载**：discovery 刻意不 import 任何插件，所以它不跑 `standingKeyFor`、不求值行配置、不检查 realm、不断言技能目录——这些属于 2b。
+`broken: null` 表示组合 YAML 合 loader 语法、每条行都能解析（`@deepseek-ai/*` 包在同一套 `node_modules` 上行查找里找得到，`./plugins/...` 相对行指向的文件存在）。在 0.2 上这个脚本会**明确报出「这份 harness 是 0.2+，目录机制的 2a 层不再适用」并退出**，而不是让你以为装坏了。
 
 **2b. 真挂载与技能目录（残余缺口，需要用本仓库之外的探针）**
 
-- `sp_probe validate=engineering` → 应得 `MOUNT OK: engineering`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）
-- `sp_verify preset=engineering cwd=<workspace>` → 断言该 preset 作用域下的技能目录
+- ≤0.1.5 时代的探针：`sp_probe validate=engineering` → 应得 `MOUNT OK: engineering`（`standingKeyFor` 真挂载：本地相对插件、`!!js`、技能目录、realm 全部合法）；`sp_verify preset=engineering cwd=<workspace>` → 断言该 preset 作用域下的技能目录。
+- harness 0.2 没有这两个探针。等价物只能在活体上取：`Config.listConfigs` 里 `preset-engineering` 行存在（声明已注册），再用一个**新建会话**验证真挂载——技能目录、`/caveman`、bootstrap 注入是否都在（这一步与第 3 层合并）。
 
 **3. 端到端（人类验收，唯一的最终证据）**
 
@@ -278,7 +347,7 @@ roster: [{"id":"engineering","name":"工程模式","order":5,"broken":null,...}]
 
 期望：模型**在写任何代码之前**先加载 `brainstorming` 技能（官方完成定义里的验收用例），且回复默认即为压缩风格。随后试 `/caveman off` 与 `/caveman ultra`，观察表达风格确实变化。
 
-**本项目目前的验证状态：第 1 层与第 2a 层都实跑过（命令与真实输出见 `evidence/VERIFICATION.md`）；2b 与第 3 层尚未验证，不要当成已通过。**
+**本项目目前的验证状态：第 1 层（`npm test`，47 pass）与 0.2 的 2a 层（`scripts/verify-preset-patch.mjs` 六项全 OK）实跑过；0.2 上「声明真的挂载成会话」与第 3 层尚未验证，不要当成已通过。** `evidence/VERIFICATION.md` 是 ≤0.1.5 目录机制的历史记录（含当时真实输出），不随机制变更改写。
 
 ## 设计要点
 
