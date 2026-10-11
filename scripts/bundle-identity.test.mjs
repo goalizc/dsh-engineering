@@ -1,10 +1,11 @@
 // scripts/bundle-identity.test.mjs
 //
 // Guards the cross-file values that make this repository a dsh bundle. Nothing
-// links them: package.json#name and the self-referential insert row in
-// cordis.patch.yml must agree or the composed profile silently loses the
-// installer layer; the `files` whitelist must carry what the installer needs at
-// runtime or the installed package is broken on arrival.
+// links them: package.json#name and the self-referential rows in
+// cordis.patch.yml must agree or the composed profile silently loses the preset
+// layer; the `files` whitelist must carry what those rows need at runtime (the
+// preset tree, and for harness ≤0.1.5 the plant engine) or the installed package
+// is broken on arrival.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -13,16 +14,41 @@ import { fileURLToPath } from 'node:url';
 
 const read = (rel) => readFile(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
-test('the patch self-reference names the package', async () => {
+test('the patch declares an agent preset whose rows name the package', async () => {
   const pkg = JSON.parse(await read('../package.json'));
   const patch = await read('../cordis.patch.yml');
-  const rowName = /^\s*name:\s*'([^']+)'\s*$/m.exec(patch)?.[1];
+  assert.match(patch, /^\s+- id: preset-engineering$/m, 'the 0.2 declaration row is missing');
+  assert.match(
+    patch,
+    /^\s+name: "@deepseek-ai\/dsh-agent-preset"$/m,
+    'the declaration must be a @deepseek-ai/dsh-agent-preset row: that is how 0.2 ' +
+      'registers a preset (the ≤0.1.5 $DSH_HOME/.agent-presets scan is gone)',
+  );
+  const local = [...patch.matchAll(/^\s+name: '([^']*\/preset\/plugins\/[^']+)'$/gm)].map(
+    (m) => m[1],
+  );
   assert.equal(
-    rowName,
-    pkg.name,
-    `cordis.patch.yml must insert a row named ${JSON.stringify(pkg.name)}, the ` +
-      `installed package name; got ${JSON.stringify(rowName)}. The row is how the ` +
-      `bundle mounts itself, so a mismatch drops the installer from the composition.`,
+    local.length,
+    3,
+    `every preset-local plugin row must be a package subpath; got:\n${local.join('\n')}`,
+  );
+  for (const name of local) {
+    assert.ok(
+      name.startsWith(`${pkg.name}/preset/plugins/`),
+      `preset-local plugin rows must resolve inside the installed package ` +
+        `(${JSON.stringify(pkg.name)}), got ${JSON.stringify(name)}. A relative './' row ` +
+        `resolves against the profile directory on 0.2, not the preset directory.`,
+    );
+  }
+});
+
+test('the legacy directory-planter row is not wired into the 0.2 patch', async () => {
+  const patch = await read('../cordis.patch.yml');
+  assert.doesNotMatch(
+    patch,
+    /engineering-installer/,
+    'index.js plants into $DSH_HOME/.agent-presets, a directory harness 0.2 never reads: ' +
+      'the row must not be inserted (the ≤0.1.5 path is the published v0.1.0 tag).',
   );
 });
 

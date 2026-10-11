@@ -3,6 +3,11 @@
  * Composition health of an INSTALLED preset, judged by the harness's own
  * roster check (layer 2a of this project's verification).
  *
+ * 适用范围: harness ≤0.1.5（$DSH_HOME/.agent-presets 目录机制）。0.2 删除了
+ * `@deepseek-ai/dsh-agent-presets`，preset 改为组合里的 `@deepseek-ai/dsh-agent-preset`
+ * 声明行，本脚本会明确报出这一点并退出 —— 0.2 用 `scripts/verify-preset-patch.mjs`
+ * （静态）+ `cordis_inspect_query` 的 `Config.listConfigs`（活体）。
+ *
  * This runs the same `discoverPresets` the harness's preset picker reads, with
  * the caller's own harness base as the resolution root. It catches the class of
  * rot a per-task review cannot see, because a clean checkout says nothing about
@@ -167,6 +172,24 @@ async function main() {
     if (discoverPresets !== undefined) break;
   }
   if (discoverPresets === undefined) {
+    // 0.2 起没有 @deepseek-ai/dsh-agent-presets：目录机制被删，本脚本整体不适用。
+    // 报清楚原因，别让使用者以为是自己装坏了。
+    const is02 = candidates.some((candidate) =>
+      existsSync(
+        join(fileURLToPath(candidate), 'node_modules', '@deepseek-ai', 'dsh-agent-preset'),
+      ),
+    );
+    if (is02) {
+      console.error(
+        'verify-composition: 这份 harness 是 0.2+（有 @deepseek-ai/dsh-agent-preset，' +
+          '没有 @deepseek-ai/dsh-agent-presets）。0.2 删除了 $DSH_HOME/.agent-presets 的目录扫描，' +
+          'preset 改为组合里的声明行，本脚本（目录机制的 2a 层）不再适用。请改用：\n' +
+          '  node scripts/verify-preset-patch.mjs   # 静态：声明行可用于挂载\n' +
+          '  cordis_inspect_query Config.listConfigs (name=@deepseek-ai/dsh-agent-preset)\n' +
+          '                                          # 活体：应列出 include:preset-engineering',
+      );
+      return 1;
+    }
     console.error(
       'verify-composition: no usable harness install found. Pass --harness-base ' +
         '<dsh-root> or set DSH_HARNESS_BASE to the directory holding the installed ' +

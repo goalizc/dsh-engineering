@@ -1,3 +1,11 @@
+// 本包的 ≤0.1.5 通道：启动该 profile 时把 preset/ 植入
+// `${DSH_HOME}/.agent-presets/engineering/`，那时的 harness 用
+// @deepseek-ai/dsh-agent-presets 扫描这个目录。
+//
+// harness 0.2 删除了那套目录机制，preset 改为组合里的 @deepseek-ai/dsh-agent-preset
+// 声明行，因此 cordis.patch.yml **不再插入本插件**（见 scripts/build-preset-patch.mjs）；
+// 0.2 上这些文件由声明行的包内子路径直接引用，无需植入。保留本文件与 scripts/plant-core.mjs
+// 只为让使用 ≤0.1.5 的人继续走 `scripts/install.sh`，0.2 上不会被加载。
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';

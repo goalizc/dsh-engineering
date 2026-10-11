@@ -1,6 +1,6 @@
 {
   "name": "@goalizc/dsh-engineering",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Superpowers and Caveman skills as a DeepSeek Harness agent preset bundle.",
   "repository": {
     "type": "git",
@@ -17,6 +17,8 @@
   "publishConfig": { "access": "public" },
   "scripts": {
     "build:manifest": "node scripts/build-manifest.mjs preset --out preset/.manifest.json",
+    "build:preset-patch": "node scripts/build-preset-patch.mjs --write",
+    "verify:preset-patch": "node scripts/verify-preset-patch.mjs",
     "pretest": "npm run build:manifest",
     "test": "node --test scripts/*.test.mjs preset/plugins/*/*.test.mjs"
   }

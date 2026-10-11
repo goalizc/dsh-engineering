@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Install (or refresh) the engineering-mode preset into the DSH user preset root.
 #
+# 适用范围: harness ≤0.1.5。0.2 删除了 `$DSH_HOME/.agent-presets` 的目录扫描
+# （连同 `@deepseek-ai/dsh-agent-presets` 一起），preset 改为组合里的
+# `@deepseek-ai/dsh-agent-preset` 声明行 —— 0.2 请用 bundle 通道（cordis.patch.yml，
+# 由 scripts/build-preset-patch.mjs 生成），不要跑本脚本：它植入的目录 0.2 不会读，
+# 表现就是模式选择器里没有「工程模式」。
+#
 # The preset is self-contained: its bootstrap plugin imports nothing from the
 # harness (the message id it needs comes from `node:crypto`), so it copies or
 # links cleanly onto any machine with a compatible capacitor.
