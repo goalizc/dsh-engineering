@@ -13,3 +13,6 @@ preset/.manifest.json
 
 # 自管的上游检出缓存（sync 脚本自动 clone/fetch；可重建，不入库）
 .cache/
+
+# 发布打包产物：npm pack 的 tarball 由发布者现打（版本一升就过期），不入库
+*.tgz
