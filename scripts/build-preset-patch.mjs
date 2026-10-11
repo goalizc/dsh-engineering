@@ -58,13 +58,14 @@ export const RENAMED_PLUGINS = new Map([
   ['workflow-worker-thread', 'workflow-ptc'],
 ]);
 
+// skills 目录：与 shipped 的 `cordis` 预设同一惯用法——preset 子行的 `!!js` 里
+// `baseUrl` 就是声明行继承来的 baseUrl，用 createRequire 解析本包 package.json 定位
+// <pkg>/preset/skills。没有回落分支：解析不到就让它响亮地失败。
 const SKILLS_EXPR =
-  "(() => { try { const p = process.getBuiltinModule('node:path'); " +
-  "return p.join(p.dirname(process.getBuiltinModule('node:module').createRequire(baseUrl)" +
-  ".resolve('{{PKG}}/package.json')), 'preset', 'skills'); } catch { " +
-  "const p = process.getBuiltinModule('node:path'); " +
-  "const home = process.env.DSH_HOME || p.join(process.getBuiltinModule('node:os').homedir(), '.dsh'); " +
-  "return p.join(home, '.agent-presets', '{{ID}}', 'skills'); } })()";
+  "process.getBuiltinModule('node:path').join(" +
+  "process.getBuiltinModule('node:path').dirname(" +
+  "process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('{{PKG}}/package.json')" +
+  "), 'preset', 'skills')";
 
 /** `key: value` 形式的单行标量（preset.yml 的三个字段都是单行）。 */
 export function metaField(text, key) {
@@ -80,10 +81,9 @@ export function metaField(text, key) {
  *
  * @param composition - agent.cordis.yml 原文。
  * @param packageName - 本包名（package.json#name），用于包内子路径。
- * @param presetId - preset id，用于 skills 回落目录。
  * @returns 缩进到 `plugins:` 之下的 YAML 片段。
  */
-export function transformComposition({ composition, packageName, presetId }) {
+export function transformComposition({ composition, packageName }) {
   let out = composition.replace(
     /name: '\.\/plugins\/([^']+)'/g,
     (_all, rest) => `name: '${packageName}/preset/plugins/${rest}'`,
@@ -105,7 +105,7 @@ export function transformComposition({ composition, packageName, presetId }) {
         '已不是已知的 0.1.5 写法。不要跳过这一步——它会静默产出一个 skills 指向错误的 preset。',
     );
   }
-  const skills = SKILLS_EXPR.replaceAll('{{PKG}}', packageName).replaceAll('{{ID}}', presetId);
+  const skills = SKILLS_EXPR.replaceAll('{{PKG}}', packageName);
   out = out.replace(LEGACY_SKILLS_EXPR, `!!js "${skills}"`);
 
   return out
@@ -134,7 +134,7 @@ export async function renderPresetPatch({
   const displayName = metaField(metaText, 'name');
   const description = metaField(metaText, 'description');
   const order = metaField(metaText, 'order');
-  const plugins = transformComposition({ composition: compositionText, packageName: name, presetId });
+  const plugins = transformComposition({ composition: compositionText, packageName: name });
   // 显示名与描述一律按单引号标量输出：两者来自 preset.yml 的单行文本，将来出现 `:`、
   // 前导 `-`/`#` 之类的字符时也不会把 YAML 写坏（YAML 里单引号自身写成两个）。
   const quoted = (value) => `'${value.replaceAll("'", "''")}'`;

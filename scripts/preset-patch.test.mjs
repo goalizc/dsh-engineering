@@ -76,7 +76,7 @@ test('生成器对「skills 表达式不认识」报错，而不是静默产出�
   );
   assert.notEqual(doctored, source, '测试夹具没能改掉 skills 表达式');
   assert.throws(
-    () => transformComposition({ composition: doctored, packageName: 'pkg', presetId: 'x' }),
+    () => transformComposition({ composition: doctored, packageName: 'pkg' }),
     /skills 目录表达式未命中/,
   );
 });

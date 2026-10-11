@@ -327,7 +327,7 @@
             name: '@deepseek-ai/dsh-skill-filesystem'
             config:
               customSkillDirs:
-                - !!js "(() => { try { const p = process.getBuiltinModule('node:path'); return p.join(p.dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@goalizc/dsh-engineering/package.json')), 'preset', 'skills'); } catch { const p = process.getBuiltinModule('node:path'); const home = process.env.DSH_HOME || p.join(process.getBuiltinModule('node:os').homedir(), '.dsh'); return p.join(home, '.agent-presets', 'engineering', 'skills'); } })()"
+                - !!js "process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@goalizc/dsh-engineering/package.json')), 'preset', 'skills')"
 
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'
