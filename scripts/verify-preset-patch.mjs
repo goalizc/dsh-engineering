@@ -8,8 +8,8 @@
 //   drift      产物是否等于生成器输出（node scripts/build-preset-patch.mjs --check）
 //   dialect    能否被 harness 自己的 YAML 方言解析（`!!js` → {__jsExpr}）；
 //              需要一份已安装的 harness 提供 js-yaml，找不到时记 skip 而不是 fail
-//   specifiers 每一行的 specifier 是否真的解析得到（@deepseek-ai/* 包、
-//              <本包名>/preset/... 包内文件、cordis: 内建）
+//   specifiers 每一行的 specifier 是否真的解析得到：`@deepseek-ai/*`（含 exports
+//              子路径，用 Node 自己的解析）与 `<本包名>/preset/...` 包内文件
 //   porting    0.2 的两个已知陷阱：'./plugins/…' 相对行、已消失的 worker-thread 包
 //
 // 它不证明的事：不挂载、不跑 preset。挂载状态只能看活体宿主——
@@ -19,7 +19,8 @@
 // 用法:
 //   node scripts/verify-preset-patch.mjs [--repo <dir>] [--harness-base <dir>]
 //
-// 退出码 0 = 全部通过（skip 不算失败）；1 = 有 fail。
+// 退出码 0 = 全部通过（skip 不算失败，裸检出没有 harness 时 dialect/specifiers 会 skip）；
+// 1 = 有 fail；2 = 命令行用法错误（缺值等）。
 import { existsSync, realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -30,9 +31,8 @@ import { PATCH_FILE, PRESET_ID, REPO, renderPresetPatch } from './build-preset-p
 /**
  * 候选的 harness node_modules 目录（内含 `@deepseek-ai/*` 与 js-yaml）。
  *
- * 两条路线都要覆盖：`dsh` 启动器（部署里真正在跑的那份）与仓库自带的
- * `preset/node_modules/@deepseek-ai` 链接（install.sh 重建，指向已安装 harness 的
- * 依赖树）。后者是换机后唯一一定存在的路线。
+ * 三条路线：`DSH_HARNESS_BASE`、`dsh` 启动器（部署里真正在跑的那份）、以及仓库里
+ * 可能存在的 `preset/node_modules/@deepseek-ai` 本机链接（可选的本地便利，不存在也没关系）。
  */
 export function harnessModuleDirs({ repo = REPO, env = process.env } = {}) {
   const found = [];
@@ -65,11 +65,26 @@ function firstWithJsYaml(dirs) {
   return undefined;
 }
 
-/** 解析 harness 侧包名；不存在返回 undefined。
+/**
+ * 一个 harness specifier 能否被 Node 解析（子路径走包的 `exports`）。
  *
- * 只查到**包**这一级，不查子路径（如 `@deepseek-ai/dsh-tool-subagent-control/list-agents`）：
- * 那些子路径由包的 `exports` 字段提供，磁盘上通常没有同名文件，静态判断只能交给包自己。
+ * 用 `createRequire(<harness>/node_modules/)` 而不是「目录里有没有同名文件」：
+ * `@deepseek-ai/dsh-tool-subagent-control/list-agents` 这类行由 exports 映射提供，
+ * 磁盘上没有对应文件。实测 shipped 的四个 preset 与本仓库产物的全部 specifier 都能解析。
+ *
+ * 解析失败时报 fail 而不是放过：若将来某个包只声明 `import` 条件的 exports，
+ * 这里会成为一条**响亮**的误报（消息里点了名），而不是一次静默漏检。
  */
+function harnessSpecifierResolves(modules, name) {
+  try {
+    createRequire(join(modules, 'noop.js')).resolve(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 该 specifier 的包目录（仅用于把「包没了」与「子路径没了」分开报）。 */
 function harnessPackageDir(modules, name) {
   const rest = name.slice('@deepseek-ai/'.length);
   const pkg = rest.startsWith('@') ? rest.split('/').slice(0, 2).join('/') : rest.split('/')[0];
@@ -192,35 +207,37 @@ export async function verifyPresetPatch({ repo = REPO, harnessBase } = {}) {
         }
         if (name.startsWith('@deepseek-ai/')) {
           if (modules !== undefined || candidates.length > 0) {
-            const hit = candidates.some((dir) => harnessPackageDir(dir, name) !== undefined);
-            if (!hit) unresolved.push(`${id}: harness 包不存在（0.2 是否已改名/删除？）`);
+            const hit = candidates.some((dir) => harnessSpecifierResolves(dir, name));
+            if (!hit) {
+              const pkgDir = candidates.map((dir) => harnessPackageDir(dir, name)).find(Boolean);
+              unresolved.push(
+                pkgDir === undefined
+                  ? `${id}: harness 包不存在（0.2 是否已改名/删除？）`
+                  : `${id}: 包在但 specifier 解析不到（${name} 的 exports 改过？）`,
+              );
+            }
           }
           continue;
         }
         unresolved.push(`${id}: 无法判定的 specifier ${name}`);
       }
+      const harnessChecked = modules !== undefined || candidates.length > 0;
       checks.push(
         unresolved.length === 0
           ? {
               name: 'specifiers',
-              status: modules !== undefined || candidates.length > 0 ? 'ok' : 'skip',
-              detail:
-                modules !== undefined || candidates.length > 0
-                  ? `${rows.length} 行全部解析得到`
-                  : `${rows.length} 行，但找不到 harness 依赖树（只查了包内文件）`,
+              status: harnessChecked ? 'ok' : 'skip',
+              detail: harnessChecked
+                ? `${config.plugins.length} 个顶层行 / 含嵌套 ${rows.length} 行全部解析得到`
+                : `${config.plugins.length} 个顶层行 / 含嵌套 ${rows.length} 行，但找不到 harness 依赖树（只查了包内文件）`,
             }
           : { name: 'specifiers', status: 'fail', detail: unresolved.join('; ') },
       );
-      checks.push({
-        name: 'row-count',
-        status: 'ok',
-        detail: `${config.plugins.length} 个顶层行 / 含嵌套共 ${rows.length} 行`,
-      });
     }
   }
 
   const traps = [];
-  // 只扫非注释行：生成物的头部注释**故意**点名这两个陷阱（worker-thread 改名、
+  // 只扫非注释行：生成物的头部注释**故意**点名这几个陷阱（worker-thread 改名、
   // './' 相对行），拿全文扫会把文档当成违规。
   const scannable = text
     .split('\n')
@@ -230,7 +247,7 @@ export async function verifyPresetPatch({ repo = REPO, harnessBase } = {}) {
   if (scannable.includes('@deepseek-ai/dsh-workflow-worker-thread'))
     traps.push('残留 @deepseek-ai/dsh-workflow-worker-thread（0.2 无此包）');
   if (scannable.includes('engineering-installer'))
-    traps.push('残留 engineering-installer 行（往 0.2 不读的 .agent-presets 植入）');
+    traps.push('残留 engineering-installer 行（目录植入通道已删除，0.2 只认声明行）');
   checks.push(
     traps.length === 0
       ? { name: 'porting', status: 'ok', detail: '没有 0.1.5 → 0.2 的已知陷阱' }
@@ -246,6 +263,13 @@ async function main() {
     const i = argv.indexOf(flag);
     return i === -1 ? undefined : argv[i + 1];
   };
+  for (const flag of ['--repo', '--harness-base']) {
+    if (argv.includes(flag) && (arg(flag) === undefined || arg(flag).startsWith('--'))) {
+      console.error(`verify-preset-patch: ${flag} 需要一个值`);
+      process.exitCode = 2;
+      return;
+    }
+  }
   const repo = arg('--repo') === undefined ? REPO : resolve(arg('--repo'));
   const harnessBase = arg('--harness-base');
   const { ok, checks } = await verifyPresetPatch({ repo, harnessBase });

@@ -34,7 +34,7 @@ test('声明行是 0.2 的 @deepseek-ai/dsh-agent-preset，带显示名与排序
   assert.match(patch, /^\s+- id: preset-engineering$/m);
   assert.match(patch, /^\s+name: "@deepseek-ai\/dsh-agent-preset"$/m);
   assert.match(patch, /^\s+id: engineering$/m);
-  assert.match(patch, /^\s+name: 工程模式$/m);
+  assert.match(patch, /^\s+name: '工程模式'$/m);
   assert.match(patch, /^\s+order: 5$/m);
 });
 
@@ -97,10 +97,45 @@ test('静态校验全部通过（drift/dialect/specifiers/porting）', async () 
     `preset patch 静态校验失败:\n${failed.map((c) => `  ${c.name}: ${c.detail}`).join('\n')}`,
   );
   assert.ok(ok);
-  // 本地有 harness 依赖树（install.sh 建的 preset/node_modules 链接）时，YAML 方言解析
+  // 本地有 harness 依赖树（本机可选的 preset/node_modules 链接）时，YAML 方言解析
   // 必须真的跑过；裸检出没有 harness 时允许 skip，但不允许静默变成 fail。
   if (existsSync(fileURLToPath(new URL('../preset/node_modules/@deepseek-ai', import.meta.url)))) {
     const dialect = checks.find((check) => check.name === 'dialect');
     assert.equal(dialect?.status, 'ok', `本机应能解析 YAML 方言: ${JSON.stringify(dialect)}`);
   }
+});
+
+test('两个 CLI 对坏旗标与坏目录报错，而不是静默给出结论', async () => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const run = promisify(execFile);
+  const status = async (rel, args) => {
+    const file = fileURLToPath(new URL(rel, import.meta.url));
+    try {
+      await run(process.execPath, [file, ...args]);
+      return 0;
+    } catch (error) {
+      return error.code;
+    }
+  };
+  assert.equal(
+    await status('../scripts/build-preset-patch.mjs', ['--write', '--out', '/tmp/never.yml']),
+    2,
+    '--write 与 --out 同时给出必须拒绝',
+  );
+  assert.equal(
+    await status('../scripts/build-preset-patch.mjs', ['--out']),
+    2,
+    '--out 缺值必须拒绝',
+  );
+  assert.equal(
+    await status('../scripts/verify-preset-patch.mjs', ['--harness-base']),
+    2,
+    '--harness-base 缺值必须拒绝',
+  );
+  assert.equal(
+    await status('../scripts/verify-preset-patch.mjs', ['--harness-base', '/tmp']),
+    1,
+    '--harness-base 指到没有依赖树的目录必须 FAIL（退出 1），不能退化成 skip 后报「通过」',
+  );
 });

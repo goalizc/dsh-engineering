@@ -135,6 +135,9 @@ export async function renderPresetPatch({
   const description = metaField(metaText, 'description');
   const order = metaField(metaText, 'order');
   const plugins = transformComposition({ composition: compositionText, packageName: name, presetId });
+  // 显示名与描述一律按单引号标量输出：两者来自 preset.yml 的单行文本，将来出现 `:`、
+  // 前导 `-`/`#` 之类的字符时也不会把 YAML 写坏（YAML 里单引号自身写成两个）。
+  const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
 
   return `# cordis.patch.yml — 生成物，请勿手改。
 # 改 preset/agent.cordis.yml 或 preset/preset.yml 后运行:
@@ -155,8 +158,8 @@ export async function renderPresetPatch({
       name: "${DECLARATION_PLUGIN}"
       config:
         id: ${presetId}
-        name: ${displayName}
-        description: '${description.replaceAll("'", "''")}'
+        name: ${quoted(displayName)}
+        description: ${quoted(description)}
         order: ${order}
         plugins:
 ${plugins}
@@ -166,6 +169,16 @@ ${plugins}
 async function main() {
   const argv = process.argv.slice(2);
   const outIndex = argv.indexOf('--out');
+  if (argv.includes('--write') && outIndex !== -1) {
+    console.error('build-preset-patch: --write 与 --out 不能同时给出（一个写仓库产物，一个写别处）');
+    process.exitCode = 2;
+    return;
+  }
+  if (outIndex !== -1 && (argv[outIndex + 1] === undefined || argv[outIndex + 1].startsWith('--'))) {
+    console.error('build-preset-patch: --out 需要一个路径');
+    process.exitCode = 2;
+    return;
+  }
   if (argv.includes('--check')) {
     const [text, current] = await Promise.all([
       renderPresetPatch(),
@@ -182,9 +195,10 @@ async function main() {
     return;
   }
   const text = await renderPresetPatch();
+  const lines = text.trimEnd().split('\n').length;
   if (argv.includes('--write')) {
     await writeFile(join(REPO, PATCH_FILE), text);
-    console.log(`wrote ${PATCH_FILE} (${text.split('\n').length} 行)`);
+    console.log(`wrote ${PATCH_FILE} (${lines} 行)`);
     return;
   }
   if (outIndex !== -1) {

@@ -17,7 +17,7 @@
       name: "@deepseek-ai/dsh-agent-preset"
       config:
         id: engineering
-        name: 工程模式
+        name: '工程模式'
         description: '在标准模式之上集成 Superpowers 技能方法论与 Caveman 压缩风格：设计澄清 → 实施计划 → 子代理驱动开发 → TDD → 评审与验证，且默认以 full 级压缩表达。bootstrap 由模式自带插件在每个会话自动注入，技能随模式分发，无需逐会话手动开启。'
         order: 5
         plugins:
