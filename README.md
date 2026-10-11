@@ -264,7 +264,7 @@ npm run verify:preset-patch
 
 期望：模型**在写任何代码之前**先加载 `brainstorming` 技能（官方完成定义里的验收用例），且回复默认即为压缩风格。随后试 `/caveman off` 与 `/caveman ultra`，观察表达风格确实变化。
 
-**本项目目前的验证状态：第 1 层（`npm test`，25 pass）、2a 层（`npm run verify:preset-patch` 五项全 OK）与 2b 的「声明已注册」（`Config.listConfigs` 列出 `include:preset-engineering`）实跑过；「声明真的挂载成会话」与第 3 层尚未验证，不要当成已通过。** `evidence/VERIFICATION.md` 是 ≤0.1.5 目录机制的历史记录（含当时真实输出），不随机制变更改写。
+**验证状态（2026-10-11，harness 0.2.0-rc.2）**：第 1 层（`npm test`，27 pass）、2a 层（`npm run verify:preset-patch` 五项全 OK）、2b 的「声明已注册」（`Config.listConfigs` 列出 `include:preset-engineering`）与**真挂载**（新建会话选中 `工程模式`，preset 正常挂载）都已实跑。随后该会话**首轮失败**于注入消息的 source 形状：`format v4 message requires a producer-owned source kind`——三个注入点当时仍写 0.1.5 的 `{ kind: 'plugin', plugin }` 包装，而会话格式 v4 只认生产者自有 kind；已修（`e2505e3`）并加了仓库级守卫（`scripts/message-source.test.mjs`）。**第 3 层端到端验收（模型按流程先加载技能）仍待修复后的会话确认，不要当成已通过。** `evidence/VERIFICATION.md` 是 ≤0.1.5 目录机制的历史记录（含当时真实输出），不随机制变更改写。
 
 ## 设计要点
 
