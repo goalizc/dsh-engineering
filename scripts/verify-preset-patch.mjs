@@ -24,7 +24,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { delimiter, dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { PATCH_FILE, PRESET_ID, REPO, renderPresetPatch } from './build-preset-patch.mjs';
 
 /**
@@ -65,7 +65,11 @@ function firstWithJsYaml(dirs) {
   return undefined;
 }
 
-/** 解析 harness 侧包名；不存在返回 undefined。 */
+/** 解析 harness 侧包名；不存在返回 undefined。
+ *
+ * 只查到**包**这一级，不查子路径（如 `@deepseek-ai/dsh-tool-subagent-control/list-agents`）：
+ * 那些子路径由包的 `exports` 字段提供，磁盘上通常没有同名文件，静态判断只能交给包自己。
+ */
 function harnessPackageDir(modules, name) {
   const rest = name.slice('@deepseek-ai/'.length);
   const pkg = rest.startsWith('@') ? rest.split('/').slice(0, 2).join('/') : rest.split('/')[0];
@@ -115,11 +119,21 @@ export async function verifyPresetPatch({ repo = REPO, harnessBase } = {}) {
 
   let doc;
   if (jsYamlDir === undefined) {
-    checks.push({
-      name: 'dialect',
-      status: 'skip',
-      detail: '找不到已安装 harness 提供的 js-yaml（用 --harness-base 指一份）',
-    });
+    // 显式给了 --harness-base 却在里面找不到依赖树，是使用者指错了目录：必须报 fail，
+    // 否则 dialect/specifiers 一起退化成 skip，脚本仍然打印「通过」——一次静默失效。
+    checks.push(
+      modules !== undefined
+        ? {
+            name: 'dialect',
+            status: 'fail',
+            detail: `--harness-base 指向的 ${modules} 下没有 js-yaml：那不是一个 harness 根目录`,
+          }
+        : {
+            name: 'dialect',
+            status: 'skip',
+            detail: '找不到已安装 harness 提供的 js-yaml（用 --harness-base 指一份）',
+          },
+    );
   } else {
     try {
       const require = createRequire(join(jsYamlDir, 'noop.js'));
