@@ -118,8 +118,8 @@ assert.equal(first.messages[0].role, 'user', 'injected message is user-role')
 assert.match(textOf(first.messages[0]), /<EXTREMELY_IMPORTANT>/, 'bootstrap marker present')
 assert.ok(textOf(first.messages[0]).includes('DeepSeek Harness tool mapping'), 'tool mapping present')
 assert.ok(textOf(first.messages[0]).includes('Repository rules take precedence'), 'precedence note present')
-assert.equal(first.messages[0].source.kind, 'plugin', 'message source is plugin-owned')
-assert.equal(first.messages[0].source.plugin, name, 'message source names this plugin')
+assert.equal(first.messages[0].source.kind, `plugin:${name}`, 'source names its producer (format v4)')
+assert.ok(!('plugin' in first.messages[0].source), 'the retired { kind: "plugin", plugin } wrapper is gone')
 
 // 2. THE REGRESSION THIS FILE EXISTS FOR: the next turn claims only its own
 //    input (the real payload), while the session history still carries the
@@ -163,7 +163,7 @@ assert.match(textOf(otherSession.messages[1]), /<EXTREMELY_IMPORTANT>/, 'bootstr
 //    by the same history read as the dedup above.
 const summary = createUserMessage({
   content: [{ type: 'text', text: '<compacted-summary>earlier work …</compacted-summary>' }],
-  source: { kind: 'plugin', plugin: 'compaction' },
+  source: { kind: 'compact-basic' },
 })
 sessionA.compact([summary])
 const resumed = claimedUserMessage('继续')
@@ -181,7 +181,7 @@ assert.match(textOf(afterCompaction.messages[1]), /<EXTREMELY_IMPORTANT>/, 'boot
 const quoted = [
   createUserMessage({
     content: [{ type: 'text', text: `${BOOTSTRAP_MARKER} quoted` }],
-    source: { kind: 'plugin', plugin: 'compaction' },
+    source: { kind: 'compact-basic' },
   }),
 ]
 const withMarker = await preStep({ agent: { session: fakeSession() }, messages: quoted, step: 1 })
@@ -196,7 +196,7 @@ assert.equal(aborted.messages.length, 0, 'aborted step is untouched')
 
 // 8. An unrelated claimed message still gets the bootstrap appended after it,
 //    and the claimed message stays first.
-const unrelated = createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'plugin', plugin: 'test' } })
+const unrelated = createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'plugin:test' } })
 const withInput = await preStep({ agent: { session: fakeSession() }, messages: [unrelated], step: 4 })
 assert.equal(withInput.messages.length, 2, 'existing claimed message preserved')
 assert.match(textOf(withInput.messages[0]), /^hello$/, 'claimed message untouched and first')
@@ -227,8 +227,8 @@ assert.equal(noAgent.messages.length, 1, 'a payload without an agent still gets 
 // 10. The marker the plugin looks for is the one it writes; identities are fresh.
 assert.ok(textOf(first.messages[0]).includes(BOOTSTRAP_MARKER), 'marker constant matches emitted text')
 assert.notEqual(
-  createUserMessage({ content: [], source: { kind: 'plugin', plugin: name } }).id,
-  createUserMessage({ content: [], source: { kind: 'plugin', plugin: name } }).id,
+  createUserMessage({ content: [], source: { kind: `plugin:${name}` } }).id,
+  createUserMessage({ content: [], source: { kind: `plugin:${name}` } }).id,
   'each injected message gets a fresh identity',
 )
 assert.ok(Object.isFrozen(first.messages[0]), 'the injected message is frozen')

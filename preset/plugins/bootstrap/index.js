@@ -105,8 +105,16 @@ function createUserMessage(input) {
  */
 const BOOTSTRAP_MARKER = '<EXTREMELY_IMPORTANT>'
 
-/** Durable message source tag: this plugin owns every message it injects. */
-const BOOTSTRAP_SOURCE = Object.freeze({ kind: 'plugin', plugin: name })
+/**
+ * Durable message source tag: this plugin owns every message it injects.
+ *
+ * Session format v4 refuses the retired wrapper `{ kind: 'plugin', plugin }`
+ * ("format v4 message requires a producer-owned source kind") and requires the
+ * producer's own kind instead. `plugin:<name>` is exactly what the harness's own
+ * v3→v4 migration produced for the messages this plugin wrote before the
+ * upgrade, so old history and new messages carry the same attribution.
+ */
+const BOOTSTRAP_SOURCE = Object.freeze({ kind: `plugin:${name}` })
 
 /**
  * Absolute path of the shipped bootstrap text.

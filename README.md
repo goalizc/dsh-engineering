@@ -118,7 +118,7 @@ Language: 中文 (zh). Reason, reply, narrate, and write every artifact in 中�
 
 合法级别共 7 个：`lite`、`full`、`ultra`、`wenyan-lite`、`wenyan-full`、`wenyan-ultra`、`off`。非法输入报错并列出全部合法值，不会静默忽略。
 
-`/caveman` 由预设自带插件 `preset/plugins/caveman-command/` 注册。上游把它交付为 **Claude Code 的 slash command**，本 harness 没有该机制——没有注册命令时，技能里写的激活契约就是不可达的。所以这里自己实现：命令把选中的级别作为一条持久 user 消息写入会话（`source: { kind: 'plugin' }`），下一轮模型从对话里读到级别，与注入的默认值走同一条路径。
+`/caveman` 由预设自带插件 `preset/plugins/caveman-command/` 注册。上游把它交付为 **Claude Code 的 slash command**，本 harness 没有该机制——没有注册命令时，技能里写的激活契约就是不可达的。所以这里自己实现：命令把选中的级别作为一条持久 user 消息写入会话（`source: { kind: 'plugin:caveman-command' }`），下一轮模型从对话里读到级别，与注入的默认值走同一条路径。
 
 ## 目录结构
 
@@ -268,7 +268,7 @@ npm run verify:preset-patch
 
 ## 设计要点
 
-- **注入的是 user 角色消息，不是 system 消息**：符合上游 Shape B 纪律，也是 DSH 记录持久上下文的方式（`createUserMessage` + `source: { kind: 'plugin', plugin }`）。
+- **注入的是 user 角色消息，不是 system 消息**：符合上游 Shape B 纪律，也是 DSH 记录持久上下文的方式（`createUserMessage` + `source: { kind: 'plugin:<插件名>' }`）。**会话格式 v4 拒收旧的 `{ kind: 'plugin', plugin }` 包装**（报错原文 `format v4 message requires a producer-owned source kind`）——它要求 source 写出自己的生产者 kind；`plugin:<name>` 与 harness 自己的 v3→v4 迁移对未知插件产出的写法一致，所以升级前写下的历史消息与升级后注入的新消息归属一致（0.2.0-rc.2 上曾因漏改这一处，导致选了工程模式后首轮直接失败）。
 - **幂等靠内容标记，但判据是"会话历史"，不是本步消息**：注入文本带 `<EXTREMELY_IMPORTANT>`。`agent/pre-step` 拿到的 `messages` 只是本步从 inbox claim 到的**增量**（`ReactLoopInbox.claim`），永远不含已注入的那条，所以插件改问会话自己：`agent.session.deriveMessages()` 里还有没有这个标记。曾经按"本步消息"去重的版本因此每个 claim 到输入的 step 都重注一次——一条 10 轮会话实测注入 11 次、`128282` 字符，另一条 12 轮注入 44 次、`513128` 字符。
 - **压缩后自愈**：压缩的 `replace` 会把被遮蔽的节点从 `deriveMessages()` 的派生历史里删掉，标记随之消失，下一次 pre-step 自动重新注入。不需要订阅压缩事件，也不需要"该步有无输入"之外的额外条件：同一次历史读取同时回答了"在不在上下文里"和"是不是刚被压缩掉"。
 - **失败姿态**：读历史整段 try/catch，读不到（会话对象形状不认识）就退化为"每个会话对象注入一次"——比按步重注好，且不阻断会话。

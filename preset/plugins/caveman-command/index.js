@@ -161,7 +161,10 @@ function executeCavemanCommand(invocation) {
   invocation.agent.followup(
     createUserMessage({
       content: [{ type: 'text', text: announcement }],
-      source: { kind: 'plugin', plugin: name },
+      // Session format v4 refuses the retired `{ kind: 'plugin', plugin }`
+      // wrapper: the source must name its producer. See BOOTSTRAP_SOURCE in
+      // ../bootstrap/index.js for the full note.
+      source: { kind: `plugin:${name}` },
     }),
   )
 

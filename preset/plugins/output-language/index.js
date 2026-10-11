@@ -196,8 +196,15 @@ function createUserMessage(input) {
   )
 }
 
-/** Durable message source tag: this plugin owns every message it injects. */
-const REMINDER_SOURCE = Object.freeze({ kind: 'plugin', plugin: name })
+/**
+ * Durable message source tag: this plugin owns every message it injects.
+ *
+ * Session format v4 refuses the retired wrapper `{ kind: 'plugin', plugin }`
+ * ("format v4 message requires a producer-owned source kind") and requires the
+ * producer's own kind instead; `plugin:<name>` matches what the harness's
+ * v3→v4 migration produced for this plugin's older messages.
+ */
+const REMINDER_SOURCE = Object.freeze({ kind: `plugin:${name}` })
 
 /**
  * Whether this batch contains a message the human wrote.

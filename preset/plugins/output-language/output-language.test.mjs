@@ -295,7 +295,9 @@ const humanMessage = createUserMessage({
 })
 const engineMessage = createUserMessage({
   content: [{ type: 'text', text: 'Current runtime context. This snapshot supersedes …' }],
-  source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+  // 真实生产者 kind：v3→v4 迁移把 `@deepseek-ai/dsh-system-prompt` 的运行时上下文
+  // 消息映射为 `runtime-context`（见 dsh-session-format-v3-to-v4 的 RENAMED_PRODUCERS）。
+  source: { kind: 'runtime-context' },
 })
 
 // 13a. A step answering the human gets the reminder appended after the batch.
@@ -304,8 +306,8 @@ assert.equal(answered.kind, 'enter')
 assert.equal(answered.messages.length, 2, 'reminder appended after the claimed message')
 assert.equal(answered.messages[0], humanMessage, 'the claimed message still leads the batch')
 assert.equal(answered.messages[1].role, 'user', 'reminder is user-role')
-assert.equal(answered.messages[1].source.plugin, name, 'reminder source names this plugin')
-assert.equal(answered.messages[1].source.kind, 'plugin', 'reminder source is plugin-owned')
+assert.equal(answered.messages[1].source.kind, `plugin:${name}`, 'source names its producer (format v4)')
+assert.ok(!('plugin' in answered.messages[1].source), 'the retired { kind: "plugin", plugin } wrapper is gone')
 assert.equal(textOf(answered.messages[1]), REMINDER.zh, 'reminder renders the live setting')
 assert.ok(Object.isFrozen(answered.messages[1]), 'the injected message is frozen')
 assert.notEqual(answered.messages[1].id, humanMessage.id, 'reminder gets a fresh identity')
