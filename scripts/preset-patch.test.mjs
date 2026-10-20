@@ -38,6 +38,25 @@ test('声明行是 0.2 的 @deepseek-ai/dsh-agent-preset，带显示名与排序
   assert.match(patch, /^\s+order: 5$/m);
 });
 
+test('persona 只引用 harness 真的注册了的 prompt 变量', async () => {
+  const source = await read('../preset/agent.cordis.yml');
+  const persona = source.match(/(?:^|\n)(- id: persona\n[\s\S]*?)(?=\n- id: )/);
+  assert.ok(persona, 'preset/agent.cordis.yml 里找不到 persona 行');
+  // harness 0.2.1-rc.2 的 dsh-agent-loop 只注册这两个变量（working directory 走
+  // dsh-working-directory 的必需 user-role context，不是 prompt 变量）。模板里出现
+  // 别的 `{{…}}` 不会在挂载时报错，只会在会话第一轮渲染 system prompt 时抛
+  // `unknown prompt variable`——正是 0.2.0/0.2.1 之间漏掉的那类静默退化。
+  const registered = new Set(['model', 'provider']);
+  const refs = [...persona[1].matchAll(/\{\{([a-z][a-z0-9_]*)\}\}/g)].map((m) => m[1]);
+  for (const ref of refs) {
+    assert.ok(
+      registered.has(ref),
+      `persona 引用了未注册的 prompt 变量 {{${ref}}}；` +
+        `harness 只注册 ${[...registered].map((n) => `{{${n}}}`).join('、')}`,
+    );
+  }
+});
+
 test('三条改写的结果都在产物里', async () => {
   const pkg = JSON.parse(await read('../package.json'));
   const patch = await read('../cordis.patch.yml');

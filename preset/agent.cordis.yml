@@ -24,11 +24,14 @@
 
 
 # The preset's own persona, shadowing the deployment default for this agent.
-# `{{model}}` and `{{cwd}}` resolve from the agent's own route and workspace.
+# `{{model}}` (and `{{provider}}`) are the only prompt variables the harness
+# registers; the working directory is required user-role context contributed by
+# `dsh-working-directory`, not a prompt variable. `{{cwd}}` here failed every
+# first turn on 0.2.1-rc.2 with `unknown prompt variable "{{cwd}}" in section
+# "deployment:persona-suffix"`, so the suffix stays omitted (it defaults empty).
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    suffix: Your working directory is {{cwd}}.
     prefix: |-
       You are a coding agent powered by the {{model}} model, running on the DeepSeek Harness, with the Superpowers skills methodology.
 
