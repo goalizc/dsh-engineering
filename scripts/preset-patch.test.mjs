@@ -124,6 +124,63 @@ test('静态校验全部通过（drift/dialect/specifiers/porting）', async () 
   }
 });
 
+test('每一行的 config 键都在 harness 该插件的 Config 里（改名会静默丢能力）', async () => {
+  // schemastery 对未知键**不报错**：`backgroundMode` 在 0.2.2 被删掉、`modelSelectionSettings`
+  // 改名为 `modelSelection` 之后，旧键依旧能挂载，只是那一行悄悄失去子代理路由选择。
+  // 这类退化在仓库里没有任何回声，所以拿已安装 harness 的真实 Config 键集对一遍。
+  // 没有 harness 时整条跳过（裸检出可跑，与 dialect 检查同策略）。
+  const { harnessModuleDirs } = await import('./verify-preset-patch.mjs');
+  const { createRequire } = await import('node:module');
+  const modules = harnessModuleDirs({ repo: REPO }).find((dir) =>
+    existsSync(`${dir}/@deepseek-ai/dsh-tool-subagent`),
+  );
+  if (modules === undefined) return;
+  const require = createRequire(`${modules}/noop.js`);
+  const yaml = require('js-yaml');
+  const JsExpr = new yaml.Type('tag:yaml.org,2002:js', {
+    kind: 'scalar',
+    resolve: (data) => typeof data === 'string',
+    construct: (data) => ({ __jsExpr: data }),
+  });
+  const doc = yaml.load(await read('../cordis.patch.yml'), {
+    schema: yaml.DEFAULT_SCHEMA.extend([JsExpr]),
+  });
+  const declaration = doc.flatMap((entry) => entry.insert ?? [])
+    .find((entry) => entry.id === 'preset-engineering');
+  assert.ok(declaration, '产物里找不到 preset-engineering 声明行');
+
+  /** 展开 group 行，得到全部插件行。 */
+  const rows = [];
+  const walk = (list) => {
+    for (const row of list ?? []) {
+      if (typeof row?.name !== 'string') continue;
+      if (row.group === true) walk(row.config);
+      else rows.push(row);
+    }
+  };
+  walk(declaration.config.plugins);
+
+  const problems = [];
+  for (const row of rows) {
+    if (!row.name.startsWith('@deepseek-ai/') || row.config === undefined) continue;
+    let Config;
+    try {
+      ({ Config } = await import(require.resolve(row.name)));
+    } catch {
+      continue; // 解析问题由 verify 的 specifiers 检查负责
+    }
+    const dict = Config?.dict ?? Config?.toJSON?.()?.properties;
+    if (dict === undefined) continue;
+    const known = new Set(Object.keys(dict));
+    for (const key of Object.keys(row.config)) {
+      if (!known.has(key)) {
+        problems.push(`${row.id} (${row.name}): config.${key} 不在 Config 里；已知键: ${[...known].join(', ')}`);
+      }
+    }
+  }
+  assert.deepEqual(problems, [], `下面这些键会被 harness 静默忽略:\n${problems.join('\n')}`);
+});
+
 test('两个 CLI 对坏旗标与坏目录报错，而不是静默给出结论', async () => {
   const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');

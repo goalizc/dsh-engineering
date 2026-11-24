@@ -209,30 +209,34 @@
             isolate:
               workflowEngine: true
             config:
+              # 0.2.2 merged `list_agents` and `wait_agent` into this package's main
+              # entry: the `./list-agents` subpath (and the separate row 0.2.0 needed) is
+              # gone, and shipped presets mount only this one row. Keeping the old
+              # subpath row makes the whole preset unrunnable after the upgrade.
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
 
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
-
+              # 0.2.2 Config keys: `modelSelection`/`modelDiscovery` replaced 0.2.0's
+              # `modelSelectionSettings`/`backgroundMode`. Unknown keys are silently
+              # ignored rather than rejected, so a stale key does not fail the mount — it
+              # just turns the capability off. Shipped presets enable both on the spawn
+              # instance and neither on fork (fork must reuse the inherited prefix).
               - id: tool-subagent
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
                   provider: spawn
                   toolName: subagent
-                  modelSelectionSettings: true
-                  backgroundMode: continuable
+                  modelSelection: true
+                  modelDiscovery: true
 
               # Fork omits model selection so provider/model stay equal to the parent and
-              # the inherited history remains eligible for KV Cache reuse. This preset
-              # keeps fork continuable; parent and child inherit the same messaging tool,
-              # while the parent id and return guidance follow the inherited history.
+              # the inherited history remains eligible for KV Cache reuse; continuation is
+              # a provider capability in 0.2.2, not a config flag.
               - id: tool-subagent-fork
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
                   provider: fork
                   toolName: subagent_fork
-                  backgroundMode: continuable
 
               # Production dsh does not install these optional providers. Install the
               # matching Bundle in this Profile and restart the Host, then copy this
@@ -244,7 +248,6 @@
                 config:
                   provider: codex
                   toolName: subagent_codex
-                  backgroundMode: one-shot
                   maxDepth: provider-managed
 
               - id: tool-subagent-claude-code
@@ -253,7 +256,6 @@
                 config:
                   provider: claude-code
                   toolName: subagent_claude_code
-                  backgroundMode: one-shot
                   maxDepth: provider-managed
 
               - id: workflow-ptc

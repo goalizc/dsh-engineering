@@ -208,7 +208,7 @@ scripts/sync-caveman-skills.sh       # -> .cache/caveman，锁定 commit
 **1. 测试（不需要 running agent，秒级）**
 
 ```sh
-npm test          # 28 pass / 0 fail
+npm test          # 29 pass / 0 fail
 ```
 
 它按 glob 收集全部测试：`scripts/*.test.mjs`（6 个文件：preset 声明守卫、caveman 三个家的默认级别与 vendored 技能级别名一致、白名单 caveman 技能存在性、任务分档守卫、bundle 身份守卫、输出语言守卫）以及 `preset/plugins/*/*.test.mjs`（三个插件的自测）。三个插件测试也可单独运行——它们不依赖 harness，用合成的 `ctx` 与 `pre-step` 决策驱动真正安装的监听器：
@@ -267,6 +267,8 @@ npm run verify:preset-patch
 **验证状态（2026-10-11，harness 0.2.0-rc.2）**：第 1 层（`npm test`，27 pass）、2a 层（`npm run verify:preset-patch` 五项全 OK）、2b 的「声明已注册」（`Config.listConfigs` 列出 `include:preset-engineering`）与**真挂载**（新建会话选中 `工程模式`，preset 正常挂载）都已实跑。随后该会话**首轮失败**于注入消息的 source 形状：`format v4 message requires a producer-owned source kind`——三个注入点当时仍写 0.1.5 的 `{ kind: 'plugin', plugin }` 包装，而会话格式 v4 只认生产者自有 kind；已修（`e2505e3`）并加了仓库级守卫（`scripts/message-source.test.mjs`）；**修复后重启复跑通过，工程模式会话可正常使用**。第 3 层里「先加载 `brainstorming` 技能」这类流程行为没有逐项留证，需要时按 2b 的活体方法再过一遍。`evidence/VERIFICATION.md` 是 ≤0.1.5 目录机制的历史记录（含当时真实输出），不随机制变更改写。
 
 **验证状态（2026-10-20，harness 0.2.1-rc.2）**：工程模式新会话首轮报 `unknown prompt variable "{{cwd}}" in section "deployment:persona-suffix"`。原因是 persona 的 suffix 写了 `{{cwd}}`，而 `dsh-agent-loop` 只注册 `{{provider}}` 与 `{{model}}`；工作目录由 `dsh-working-directory` 以**必需 user-role context** 注入，从来不是 prompt 变量。已删掉该 suffix（默认空），并在 `scripts/preset-patch.test.mjs` 加了「persona 只能引用已注册变量」的守卫。本轮验证：`npm test` 28 pass / 0 fail、`verify:preset-patch` 五项 OK，且用 harness 真正的 `renderPrompt` 对产物里的 persona 段渲染通过。活体复验仍需**重启宿主 + 新建会话**后确认。
+
+**验证状态（2026-11-24，harness 0.2.2-rc.5）**：0.2.2 把 `list_agents`/`wait_agent` 合并进 `@deepseek-ai/dsh-tool-subagent-control` 主入口——`./list-agents` 子路径被删，shipped preset 也不再挂那行；同时 `dsh-tool-subagent` 的 Config 把 `modelSelectionSettings`→`modelSelection`、并删掉 `backgroundMode`（继续/一次性成了 provider 能力，不再是 flag）。旧行/旧键**不会**在挂载时报错（schemastery 静默忽略未知键），只是让 preset 不可用或悄悄丢能力。本轮：删 `tool-subagent-list-agents` 行、把 spawn 行的键改成 `modelSelection: true` + `modelDiscovery: true`（与 shipped standard 一致）、fork 行去掉 `backgroundMode`；并新增「每一行 config 键都在 harness 该插件 Config 里」守卫（读取已安装 harness 的真实 Config 键集，裸检出自动跳过）。验证：`npm test` 29 pass / 0 fail、`verify:preset-patch` 五项 OK、探针宿主用修好的 bundle 正常启动。活体复验仍需**重启宿主 + 新建会话选工程模式**确认。
 
 ## 设计要点
 
